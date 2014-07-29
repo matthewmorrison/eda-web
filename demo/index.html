@@ -93,11 +93,9 @@
 'ENDDRAW\r\n' + 
 'ENDDEF';
 		
-		var scrolls = $('.eeschema');
-
-	item.scrollTop(1);
-	
+	var scrolls = $('.eeschema');
 	var bottom = $('<div style="overflow-x: scroll; position: absolute" />');
+	
 	$(document.body).append(bottom);
 	bottom.css({ left: item.css('left'), 'height': '20px', 'top': item.position().top + item.height(), 'width': cvs.width() });
 	
