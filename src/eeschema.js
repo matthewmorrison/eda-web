@@ -1,11 +1,14 @@
 function EeSchema(container) {
     this.container = $(container);
-    this.canvas = this.container.find('canvas');
+    this.canvas = this.container.find('canvas');	
 	this.fcanvas = new fabric.Canvas(this.canvas.get(0));
 	this.canvasScale = 1;
 	this.SCALE_FACTOR = 1.2;
 	this.PAN_STEP = 1.1;
 	this.hScroller = $('<div style="overflow-x: scroll; position: absolute" />');
+	
+	this.fcanvas.setWidth(this.container.width());
+	this.fcanvas.setHeight(this.container.height());
 	
 	var ees = this;
 	container = this.container;
