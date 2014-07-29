@@ -1,4 +1,4 @@
-function Component() {
+function Component(fabric_canvas) {
 	this.group = null;
 	this.name = null;
 	this.reference = null;
@@ -11,6 +11,7 @@ function Component() {
 	this.aliases = [];
 	this.fields = {};
 	this.elements = [];
+	this.canvas = fabric_canvas;
 }
 
 Component.prototype.parseComponent = function(def) {			

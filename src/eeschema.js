@@ -1,9 +1,18 @@
-function EeSchema() {
+function EeSchema(el_canvas) {
 	this.canvas = new fabric.Canvas('canvas');
 	this.canvasScale = 1;
 	this.SCALE_FACTOR = 1.2;
 	this.PAN_STEP = 1.1;
+    this.canvas = new fabric.Canvas(el_canvas);
 }
+
+$(function() {
+    $('.eeschema').each(function(index, item) {
+        var ees = new EeSchema(item);
+        
+        $(item).data('eeschema', ees);
+    });
+});
 
 EeSchema.prototype.loadSchematic = function(file) {
 	
