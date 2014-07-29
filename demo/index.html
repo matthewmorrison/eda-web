@@ -95,34 +95,6 @@
 		
 		var scrolls = $('.eeschema');
 
-		scrolls.each(function(index, item) {
-			item = $(item);
-			var cvs = item.find('canvas');
-			
-			item.css({ 'height': cvs.css('height') - 2, 'overflow-y': 'scroll' });
-			item.on('scroll', function(e) {
-				e.preventDefault();
-				
-				var scroll = item.scrollTop();
-				
-				if(e.ctrlKey) {
-					panHorizontal(1 - scroll);
-				}
-				else if(e.altKey) {
-					panVertical(1 - scroll);
-				}
-				else if(scroll < 1) {	
-					zoomIn();
-					//canvas.zoomToPoint(new fabric.Point(cvs.width() - cvs.data('mouseX'), cvs.height() - cvs.data('mouseY')), canvas.getZoom() + SCALE_FACTOR);
-				}
-				else if(scroll > 1) {
-					zoomOut();
-					//canvas.zoomToPoint(new fabric.Point(cvs.width() - cvs.data('mouseX'), cvs.height() - cvs.data('mouseY')), canvas.getZoom() - SCALE_FACTOR);
-				}
-				
-				item.scrollTop(1);
-			});
-			
 			item.scrollTop(1);
 			
 			var bottom = $('<div style="overflow-x: scroll; position: absolute" />');
@@ -137,15 +109,14 @@
 			});
 		});
 		
-	    var ees = scrolls.data('eeschema');
+	    var ees = new EeSchema(scrolls.get(0));
 	    
-        var comp = new Component(ees.canvas);
+        var comp = new Component(ees.fcanvas);
 	    comp.parseComponent(mpu);
 		
 	    console.log(comp);
 		
-	    comp.draw();
-	            
+	    comp.draw();   
 	});
 	</script>
 	
