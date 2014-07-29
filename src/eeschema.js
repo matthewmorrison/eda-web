@@ -5,6 +5,7 @@ function EeSchema(container) {
 	this.canvasScale = 1;
 	this.SCALE_FACTOR = 1.2;
 	this.PAN_STEP = 1.1;
+	this.hScroller = $('<div style="overflow-x: scroll; position: absolute" />');
 			
 	container.css({ 'height': cvs.css('height') - 2, 'overflow-y': 'scroll' });
 	container.on('scroll', function(e) {
@@ -28,7 +29,18 @@ function EeSchema(container) {
 		container.scrollTop(1);
 	});
 
-	item.scrollTop(1);
+	container.scrollTop(1);
+	
+	
+	$(document.body).append(this.hScroller);
+	this.hScroller.css({ left: container.css('left'), 'height': '20px', 'top': container.position().top + container.height(), 'width': this.canvas.width() });
+			
+			//resetView();
+			
+		this.canvas.on('mousemove', function(e) {
+			this.canvas.data('mouseX', e.clientX);
+			this.canvas.data('mouseY', e.clientY);
+		});
 }
 
 /*$(function() {
