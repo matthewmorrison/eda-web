@@ -92,15 +92,8 @@
 'X RESV19 19 250 500 100 D 28 28 1 1 N\r\n' + 
 'ENDDRAW\r\n' + 
 'ENDDEF';
-
-		var comp = new Component();
-		comp.parseComponent(mpu);
 		
-		console.log(comp);
-		
-		//comp.draw();
-		
-		var scrolls = $('.canvas-scroll');
+		var scrolls = $('.eeschema');
 
 		scrolls.each(function(index, item) {
 			item = $(item);
@@ -143,6 +136,16 @@
 				cvs.data('mouseY', e.clientY);
 			});
 		});
+		
+	    var ees = scrolls.data('eeschema');
+	    
+        var comp = new Component(ees.canvas);
+	    comp.parseComponent(mpu);
+		
+	    console.log(comp);
+		
+	    comp.draw();
+	            
 	});
 	</script>
 	
