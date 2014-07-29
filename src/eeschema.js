@@ -7,8 +7,8 @@ function EeSchema(container) {
 	this.PAN_STEP = 1.1;
 	this.hScroller = $('<div style="overflow-x: scroll; position: absolute" />');
 			
-	container.css({ 'height': this.canvas.css('height') - 2, 'overflow-y': 'scroll' });
-	container.on('scroll', function(e) {
+	this.container.css({ 'height': this.canvas.css('height') - 2, 'overflow-y': 'scroll' });
+	this.container.on('scroll', function(e) {
 		e.preventDefault();
 		
 		var scroll = container.scrollTop();
@@ -26,14 +26,14 @@ function EeSchema(container) {
 			this.zoomOut();
 		}
 		
-		container.scrollTop(1);
+		this.container.scrollTop(1);
 	});
 
-	container.scrollTop(1);
+	this.container.scrollTop(1);
 	
 	
 	$(document.body).append(this.hScroller);
-	this.hScroller.css({ left: container.css('left'), 'height': '20px', 'top': container.position().top + container.height(), 'width': this.canvas.width() });
+	this.hScroller.css({ left: this.container.css('left'), 'height': '20px', 'top': this.container.position().top + this.container.height(), 'width': this.canvas.width() });
 			
 			//resetView();
 			
