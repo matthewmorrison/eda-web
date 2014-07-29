@@ -1,18 +1,43 @@
-function EeSchema(el_canvas) {
-	this.canvas = new fabric.Canvas('canvas');
+function EeSchema(container) {
+    this.container = $(container);
+    this.canvas = this.container.find('canvas');
+	this.fcanvas = new fabric.Canvas(this.canvas.get(0));
 	this.canvasScale = 1;
 	this.SCALE_FACTOR = 1.2;
 	this.PAN_STEP = 1.1;
-    this.canvas = new fabric.Canvas(el_canvas);
+			
+	container.css({ 'height': cvs.css('height') - 2, 'overflow-y': 'scroll' });
+	container.on('scroll', function(e) {
+		e.preventDefault();
+		
+		var scroll = item.scrollTop();
+		
+		if(e.ctrlKey) {
+			this.panHorizontal(1 - scroll);
+		}
+		else if(e.altKey) {
+			this.panVertical(1 - scroll);
+		}
+		else if(scroll < 1) {	
+			this.zoomIn();
+		}
+		else if(scroll > 1) {
+			this.zoomOut();
+		}
+		
+		container.scrollTop(1);
+	});
+
+	item.scrollTop(1);
 }
 
-$(function() {
+/*$(function() {
     $('.eeschema').each(function(index, item) {
         var ees = new EeSchema(item);
         
         $(item).data('eeschema', ees);
     });
-});
+});*/
 
 EeSchema.prototype.loadSchematic = function(file) {
 	

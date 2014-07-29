@@ -11,7 +11,7 @@ function Component(fabric_canvas) {
 	this.aliases = [];
 	this.fields = {};
 	this.elements = [];
-	this.canvas = fabric_canvas;
+	this.fcanvas = fabric_canvas;
 }
 
 Component.prototype.parseComponent = function(def) {			
@@ -196,7 +196,7 @@ Component.prototype.parseComponent = function(def) {
 		var pinRadius = 16;
 		var width = 4;
 		
-		var center = canvas.getCenter();
+		var center = this.fcanvas.getCenter();
 		this.group = new fabric.Group();
 		
 		for(var i = 0; i < this.elements.length; i++) {
@@ -280,5 +280,5 @@ Component.prototype.parseComponent = function(def) {
 			}
 		}
 		
-		canvas.add(this.group);
+		this.fcanvas.add(this.group);
 	}
