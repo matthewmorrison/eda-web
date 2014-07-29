@@ -38,8 +38,8 @@ function EeSchema(container) {
 	this.hScroller.css({ left: this.container.css('left'), 'height': '20px', 'top': this.container.position().top + this.container.height(), 'width': this.canvas.width() });
 			
 			//resetView();
-			
-	this.canvas.on('mousemove', function(e) {
+	this.fcanvas.on('mouse:move', function(obj) {
+		var e = obj.e;
 		ees.canvas.data('mouseX', e.clientX);
 		ees.canvas.data('mouseY', e.clientY);
 	});
@@ -96,7 +96,6 @@ EeSchema.prototype.zoomOut = function() {
 		
 		//console.log(canvas.getZoom());
 		//canvas.setZoom(canvas.getZoom() - SCALE_FACTOR);
-
 		var objects = this.fcanvas.getObjects();		
 		this.canvasScale = this.canvasScale / this.SCALE_FACTOR;
 		var center = this.fcanvas.getCenter();
