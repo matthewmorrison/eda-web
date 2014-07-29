@@ -92,23 +92,11 @@
 'X RESV19 19 250 500 100 D 28 28 1 1 N\r\n' + 
 'ENDDRAW\r\n' + 
 'ENDDEF';
-		
-	var scrolls = $('.eeschema');
-	var bottom = $('<div style="overflow-x: scroll; position: absolute" />');
 	
-	$(document.body).append(bottom);
-	bottom.css({ left: item.css('left'), 'height': '20px', 'top': item.position().top + item.height(), 'width': cvs.width() });
-	
-	//resetView();
-	
-	cvs.on('mousemove', function(e) {
-		cvs.data('mouseX', e.clientX);
-		cvs.data('mouseY', e.clientY);
-	});
-		
-	var ees = new EeSchema(scrolls.first().get(0));
-	    
-        var comp = new Component(ees.fcanvas);
+	    var scrolls = $('.eeschema');
+	    var ees = new EeSchema(scrolls.first().get(0));
+            var comp = new Component(ees.fcanvas);
+        
 	    comp.parseComponent(mpu);
 		
 	    console.log(comp);
