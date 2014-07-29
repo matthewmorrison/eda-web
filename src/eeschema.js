@@ -11,7 +11,7 @@ function EeSchema(container) {
 	this.container.on('scroll', function(e) {
 		e.preventDefault();
 		
-		var scroll = container.scrollTop();
+		var scroll = this.container.scrollTop();
 		
 		if(e.ctrlKey) {
 			this.panHorizontal(1 - scroll);
