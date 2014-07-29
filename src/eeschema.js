@@ -7,7 +7,7 @@ function EeSchema(container) {
 	this.PAN_STEP = 1.1;
 	this.hScroller = $('<div style="overflow-x: scroll; position: absolute" />');
 			
-	container.css({ 'height': cvs.css('height') - 2, 'overflow-y': 'scroll' });
+	container.css({ 'height': this.canvas.css('height') - 2, 'overflow-y': 'scroll' });
 	container.on('scroll', function(e) {
 		e.preventDefault();
 		
