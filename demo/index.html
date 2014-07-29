@@ -3,6 +3,7 @@
 <head>
 	<script src="//cdnjs.cloudflare.com/ajax/libs/jquery/2.1.1/jquery.min.js" ></script> 
 	<script src="//cdnjs.cloudflare.com/ajax/libs/fabric.js/1.4.8/fabric.min.js" ></script>
+<<<<<<< HEAD
 
 
     <script>
@@ -50,6 +51,10 @@
             }
         });
     </script>
+=======
+	<script src="//rawgit.com/matthewmorrison/eda-web/master/src/eeschema.js"></script>
+	<script src="//rawgit.com/matthewmorrison/eda-web/master/src/eeschema-component.js"></script>
+>>>>>>> a6b5cbec6ab36bdba60a0ae5ed44f953e99e9411
 
 	<style>
         .eeschema canvas {
@@ -141,12 +146,20 @@
 'X RESV19 19 250 500 100 D 28 28 1 1 N\r\n' + 
 'ENDDRAW\r\n' + 
 'ENDDEF';
+<<<<<<< HEAD
 		
 		var scrolls = $('.eeschema');
 		
 	    var ees = new EeSchema(scrolls.first());
 	    
         var comp = new Component(ees.fcanvas);
+=======
+	
+	    var scrolls = $('.eeschema');
+	    var ees = new EeSchema(scrolls.first().get(0));
+            var comp = new Component(ees.fcanvas);
+        
+>>>>>>> a6b5cbec6ab36bdba60a0ae5ed44f953e99e9411
 	    comp.parseComponent(mpu);
 		
 	    console.log(comp);
