@@ -6,27 +6,29 @@ function EeSchema(container) {
 	this.SCALE_FACTOR = 1.2;
 	this.PAN_STEP = 1.1;
 	this.hScroller = $('<div style="overflow-x: scroll; position: absolute" />');
-			
+	
+	var ees = this;
+	container = this.container;
 	this.container.css({ 'height': this.canvas.css('height') - 2, 'overflow-y': 'scroll' });
 	this.container.on('scroll', function(e) {
 		e.preventDefault();
 		
-		var scroll = this.container.scrollTop();
+		var scroll = container.scrollTop();
 		
 		if(e.ctrlKey) {
-			this.panHorizontal(1 - scroll);
+			ees.panHorizontal(1 - scroll);
 		}
 		else if(e.altKey) {
-			this.panVertical(1 - scroll);
+			ees.panVertical(1 - scroll);
 		}
 		else if(scroll < 1) {	
-			this.zoomIn();
+			ees.zoomIn();
 		}
 		else if(scroll > 1) {
-			this.zoomOut();
+			ees.zoomOut();
 		}
 		
-		this.container.scrollTop(1);
+		container.scrollTop(1);
 	});
 
 	this.container.scrollTop(1);
@@ -38,8 +40,8 @@ function EeSchema(container) {
 			//resetView();
 			
 	this.canvas.on('mousemove', function(e) {
-		this.canvas.data('mouseX', e.clientX);
-		this.canvas.data('mouseY', e.clientY);
+		ees.canvas.data('mouseX', e.clientX);
+		ees.canvas.data('mouseY', e.clientY);
 	});
 }
 
@@ -60,9 +62,9 @@ EeSchema.prototype.zoomIn = function() {
 		//console.log(canvas.getZoom());
 		//canvas.setZoom(canvas.getZoom()+SCALE_FACTOR);
 
-		var objects = canvas.getObjects();		
-		canvasScale = canvasScale * SCALE_FACTOR;
-		var center = canvas.getCenter();
+		var objects = this.fcanvas.getObjects();		
+        this.canvasScale = this.canvasScale * this.SCALE_FACTOR;
+		var center = this.fcanvas.getCenter();
 		var x = $('#canvas').data('mouseX');
 		var y = $('#canvas').data('mouseY');
 
@@ -72,10 +74,10 @@ EeSchema.prototype.zoomIn = function() {
 			var left = objects[i].left;
 			var top = objects[i].top;
 
-			var tempScaleX = scaleX * SCALE_FACTOR;
-			var tempScaleY = scaleY * SCALE_FACTOR;
-			var tempLeft = left * SCALE_FACTOR - x * .2;
-			var tempTop = top * SCALE_FACTOR - y * .2;
+			var tempScaleX = scaleX * this.SCALE_FACTOR;
+			var tempScaleY = scaleY * this.SCALE_FACTOR;
+			var tempLeft = left * this.SCALE_FACTOR - x * .2;
+			var tempTop = top * this.SCALE_FACTOR - y * .2;
 			
 			objects[i].scaleX = tempScaleX;
 			objects[i].scaleY = tempScaleY;
@@ -85,7 +87,7 @@ EeSchema.prototype.zoomIn = function() {
 			objects[i].setCoords();
 		}
 			
-		canvas.renderAll();
+		this.fcanvas.renderAll();
 	}
 
 	// Zoom Out
@@ -95,9 +97,9 @@ EeSchema.prototype.zoomOut = function() {
 		//console.log(canvas.getZoom());
 		//canvas.setZoom(canvas.getZoom() - SCALE_FACTOR);
 
-		var objects = canvas.getObjects();		
-		canvasScale = canvasScale / SCALE_FACTOR;
-		var center = canvas.getCenter();
+		var objects = this.fcanvas.getObjects();		
+		this.canvasScale = this.canvasScale / this.SCALE_FACTOR;
+		var center = this.fcanvas.getCenter();
 
 		for (var i in objects) {
 			var scaleX = objects[i].scaleX;
@@ -105,10 +107,10 @@ EeSchema.prototype.zoomOut = function() {
 			var left = objects[i].left;
 			var top = objects[i].top;
 		
-			var tempScaleX = scaleX * (1 / SCALE_FACTOR);
-			var tempScaleY = scaleY * (1 / SCALE_FACTOR);
-			var tempLeft = left * (1 / SCALE_FACTOR) + center.left * (.2 / SCALE_FACTOR);
-			var tempTop = top * (1 / SCALE_FACTOR) + center.top * (.2 / SCALE_FACTOR);
+			var tempScaleX = scaleX * (1 / this.SCALE_FACTOR);
+			var tempScaleY = scaleY * (1 / this.SCALE_FACTOR);
+			var tempLeft = left * (1 / this.SCALE_FACTOR) + center.left * (.2 / this.SCALE_FACTOR);
+			var tempTop = top * (1 / this.SCALE_FACTOR) + center.top * (.2 / this.SCALE_FACTOR);
 			
 			objects[i].scaleX = tempScaleX;
 			objects[i].scaleY = tempScaleY;
@@ -118,31 +120,31 @@ EeSchema.prototype.zoomOut = function() {
 			objects[i].setCoords();
 		}
 		
-		canvas.renderAll();
+		this.fcanvas.renderAll();
 	}
 	
 EeSchema.prototype.panHorizontal = function(steps) {
-		var objects = canvas.getObjects();
-		var step = PAN_STEP * steps;
+		var objects = this.fcanvas.getObjects();
+		var step = this.PAN_STEP * steps;
 	
 		for (var i in objects) {
 			objects[i].left += step;
 			objects[i].setCoords();
 		}
 		
-		canvas.renderAll();
+		this.fcanvas.renderAll();
 	}
 	
 EeSchema.prototype.panVertical = function(steps) {
-		var objects = canvas.getObjects();
-		var step = PAN_STEP * steps;
+		var objects = this.fcanvas.getObjects();
+		var step = this.PAN_STEP * steps;
 	
 		for (var i in objects) {
 			objects[i].top += step;
 			objects[i].setCoords();
 		}
 		
-		canvas.renderAll();
+        this.fcanvas.renderAll();
 	}
 	
 EeSchema.prototype.resetView = function() {
