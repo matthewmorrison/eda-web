@@ -11,7 +11,7 @@ function EeSchema(container) {
 	container.on('scroll', function(e) {
 		e.preventDefault();
 		
-		var scroll = item.scrollTop();
+		var scroll = container.scrollTop();
 		
 		if(e.ctrlKey) {
 			this.panHorizontal(1 - scroll);
@@ -37,10 +37,10 @@ function EeSchema(container) {
 			
 			//resetView();
 			
-		this.canvas.on('mousemove', function(e) {
-			this.canvas.data('mouseX', e.clientX);
-			this.canvas.data('mouseY', e.clientY);
-		});
+	this.canvas.on('mousemove', function(e) {
+		this.canvas.data('mouseX', e.clientX);
+		this.canvas.data('mouseY', e.clientY);
+	});
 }
 
 /*$(function() {
