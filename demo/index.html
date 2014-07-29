@@ -1,8 +1,8 @@
 <!DOCTYPE html>
 <html>
 <head>
-	<script src="//cdnjs.cloudflare.com/ajax/libs/jquery/2.1.1/jquery.min.js" ></script> 
-	<script src="//cdnjs.cloudflare.com/ajax/libs/fabric.js/1.4.8/fabric.min.js" ></script>
+	<script src="http://cdnjs.cloudflare.com/ajax/libs/jquery/2.1.1/jquery.min.js" ></script> 
+	<script src="http://cdnjs.cloudflare.com/ajax/libs/fabric.js/1.4.8/fabric.min.js" ></script>
 
     <script>
         function loadjscssfile(filename, filetype, onload){
@@ -38,8 +38,8 @@
             }
         }
         
-        $(function() {
-            if(window.location.host == 'localhost') {
+        $(function() {console.log(window.location.protocol);
+            if(window.location.host == 'localhost' || window.location.protocol == 'file:') {
                 loadjscssfile('eeschema-component.js', 'js', function() { loadedJs('eeschema-component') });
                 loadjscssfile('eeschema.js', 'js', function() { loadedJs('eeschema') });   
             }
@@ -49,8 +49,6 @@
             }
         });
     </script>
-	<script src="//rawgit.com/matthewmorrison/eda-web/master/src/eeschema.js"></script>
-	<script src="//rawgit.com/matthewmorrison/eda-web/master/src/eeschema-component.js"></script>
 
 	<style>
         .eeschema canvas {
@@ -70,7 +68,7 @@
 </head>
 <body>	
 	<div class="eeschema">
-		<canvas id="canvas" width="700px" height="800px" class="eeschema" />
+		<canvas id="canvas" width="1280" height="1024" />
 	</div>
 	<script>
 	
@@ -143,20 +141,11 @@
 'ENDDRAW\r\n' + 
 'ENDDEF';
 		
-		var scrolls = $('.eeschema');
-		
-	    var ees = new EeSchema(scrolls.first());
-	    
+	    var ees = new EeSchema($('.eeschema').first().get(0));
         var comp = new Component(ees.fcanvas);
-	
-	    var scrolls = $('.eeschema');
-	    var ees = new EeSchema(scrolls.first().get(0));
-            var comp = new Component(ees.fcanvas);
         
 	    comp.parseComponent(mpu);
-		
 	    console.log(comp);
-		
 	    comp.draw(); 
 	}
 	</script>
