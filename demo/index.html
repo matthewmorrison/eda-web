@@ -95,21 +95,20 @@
 		
 		var scrolls = $('.eeschema');
 
-			item.scrollTop(1);
-			
-			var bottom = $('<div style="overflow-x: scroll; position: absolute" />');
-			$(document.body).append(bottom);
-			bottom.css({ left: item.css('left'), 'height': '20px', 'top': item.position().top + item.height(), 'width': cvs.width() });
-			
-			//resetView();
-			
-			cvs.on('mousemove', function(e) {
-				cvs.data('mouseX', e.clientX);
-				cvs.data('mouseY', e.clientY);
-			});
-		});
+	item.scrollTop(1);
+	
+	var bottom = $('<div style="overflow-x: scroll; position: absolute" />');
+	$(document.body).append(bottom);
+	bottom.css({ left: item.css('left'), 'height': '20px', 'top': item.position().top + item.height(), 'width': cvs.width() });
+	
+	//resetView();
+	
+	cvs.on('mousemove', function(e) {
+		cvs.data('mouseX', e.clientX);
+		cvs.data('mouseY', e.clientY);
+	});
 		
-	    var ees = new EeSchema(scrolls.first().get(0));
+	var ees = new EeSchema(scrolls.first().get(0));
 	    
         var comp = new Component(ees.fcanvas);
 	    comp.parseComponent(mpu);
