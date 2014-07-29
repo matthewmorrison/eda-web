@@ -3,12 +3,61 @@
 <head>
 	<script src="//cdnjs.cloudflare.com/ajax/libs/jquery/2.1.1/jquery.min.js" ></script> 
 	<script src="//cdnjs.cloudflare.com/ajax/libs/fabric.js/1.4.8/fabric.min.js" ></script>
-	<script src="//rawgit.com/matthewmorrison/eda-web/master/src/eeschema-component.js"></script>
+
+
+    <script>
+        function loadjscssfile(filename, filetype, onload){
+             if (filetype=="js"){ //if filename is a external JavaScript file
+              var fileref=document.createElement('script')
+              fileref.setAttribute("type","text/javascript")
+              fileref.setAttribute("src", filename)
+             }
+             else if (filetype=="css"){ //if filename is an external CSS file
+              var fileref=document.createElement("link")
+              fileref.setAttribute("rel", "stylesheet")
+              fileref.setAttribute("type", "text/css")
+              fileref.setAttribute("href", filename)
+             }
+             if (typeof fileref!="undefined") {
+              if(typeof onload == 'function') {
+                fileref.onload = onload;
+              }
+              document.getElementsByTagName("head")[0].appendChild(fileref)
+             }
+        }
+    
+        function loadedJs(file) {
+            if(file == 'eeschema') {
+                window.loadedEES = true;
+            }
+            else if(file == 'eeschema-component') {
+                window.loadedEESC = true;
+            }
+            
+            if(window.loadedEES && window.loadedEESC) {
+                loadTest();
+            }
+        }
+        
+        $(function() {
+            if(window.location.host == 'localhost') {
+                loadjscssfile('eeschema-component.js', 'js', function() { loadedJs('eeschema-component') });
+                loadjscssfile('eeschema.js', 'js', function() { loadedJs('eeschema') });   
+            }
+            else {
+                loadjscssfile('//rawgit.com/matthewmorrison/eda-web/master/src/eeschema-component.js', 'js', function() { loadedJs('eeschema-component') });
+                loadjscssfile('//rawgit.com/matthewmorrison/eda-web/master/src/eeschema.js', 'js', function() { loadedJs('eeschema') });
+            }
+        });
+    </script>
 
 	<style>
         .eeschema canvas {
             width: 100%;
             height: 100%;
+            position: absolute;
+            right: 0;
+            bottom: 0;
         }
         
         .eeschema {
@@ -20,7 +69,7 @@
 </head>
 <body>	
 	<div class="eeschema">
-		<canvas id="canvas" class="eeschema" style="border: 1px solid #888;" />
+		<canvas id="canvas" width="700px" height="800px" class="eeschema" />
 	</div>
 	<script>
 	
@@ -35,7 +84,7 @@
 	
 	
 	
-	$(function() {
+	function loadTest() {
 		var testComp = 'DEF BEAD ?? 0 40 Y Y 1 L N\r\n' +
 'ALIAS one two three\r\n' +
 'F0 "??" 0 0 60 H V C CNN\r\n' +
@@ -94,30 +143,16 @@
 'ENDDEF';
 		
 		var scrolls = $('.eeschema');
-
-			item.scrollTop(1);
-			
-			var bottom = $('<div style="overflow-x: scroll; position: absolute" />');
-			$(document.body).append(bottom);
-			bottom.css({ left: item.css('left'), 'height': '20px', 'top': item.position().top + item.height(), 'width': cvs.width() });
-			
-			//resetView();
-			
-			cvs.on('mousemove', function(e) {
-				cvs.data('mouseX', e.clientX);
-				cvs.data('mouseY', e.clientY);
-			});
-		});
 		
-	    var ees = new EeSchema(scrolls.get(0));
+	    var ees = new EeSchema(scrolls.first());
 	    
         var comp = new Component(ees.fcanvas);
 	    comp.parseComponent(mpu);
 		
 	    console.log(comp);
 		
-	    comp.draw();   
-	});
+	    comp.draw(); 
+	}
 	</script>
 	
 	<script>
