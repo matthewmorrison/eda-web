@@ -5,7 +5,13 @@ function EeSchema(container) {
 	this.canvasScale = 1;
 	this.SCALE_FACTOR = 1.2;
 	this.PAN_STEP = 1.1;
+	this.canvasPan = [0, 0];
 	this.hScroller = $('<div style="overflow-x: scroll; position: absolute" />');
+	this.localMode = false;
+	this.libraries = {};
+	this.components = [];
+	this.wires = []; // and busses
+	this.junctions = [];
 	
 	this.fcanvas.setWidth(this.container.width());
 	this.fcanvas.setHeight(this.container.height());
@@ -56,8 +62,143 @@ function EeSchema(container) {
     });
 });*/
 
-EeSchema.prototype.loadSchematic = function(file) {
+EeSchema.prototype.open = function(location) {
+	$.ajax(location)
+	.done(function(response) {
+		console.log(response);
+		this.parseSchematic(response);
+	});
+}
+
+EeSchema.prototype.parseSchematic = function(txt) {
+	var lines = txt.split('\n');
+	var section = '';
+			
+	for(var l_index = 0; l_index < lines.length; l_index++) {
+		var line = lines[l_index];
+		
+		if(line[0] != '#') { //Skip comments
+			var props = line.match(/(?:[^\s"]+|"[^"]*")+/g);
+			
+			if(props[0].indexOf('LIBS:') == 0 && !this.localMode) {
+				console.log('Load-', props[0].substring(5));
+			}
+			else if(props[0] == '$Comp') {
+				l_index += this.parseComponent(lines.slice(l_index));
+			}
+			else if(props[0] == 'Wire' || props[0] == 'Entry') {
+				var wire = {
+					type: props[0],
+					purpose: props[1],
+					characteristic: props[2],
+				}
+				
+				l_index++;
+				line = lines[l_index];
+				
+				props = line.match(/(?:[^\s"]+|"[^"]*")+/g);
+				
+				wire.x0 = props[0];
+				wire.y0 = props[1];
+				wire.x1 = props[2];
+				wire.y1 = props[3];
+
+				var l = new fabric.Line([ wire.x0, wire.y0, wire.x1, wire.y1 ], {
+					stroke: 'black',
+					strokeWidth: 1,
+					left: wire.x0,
+					top: wire.y0
+				});
+				
+				l.lineType = wire.type;
+				l.linePurpose = wire.purpose;
+				l.lineCharacteristic = wire.characteristic;
+				
+				this.fcanvas.add(l);
+				this.wires.push(l);
+			}
+		}
+	}
 	
+	//this.resetView();
+}
+
+EeSchema.prototype.parseComponent = function(lines) {
+	var l_index = 0;
+	var center = this.fcanvas.getCenter();
+	var comp = {
+		fabric: null,
+		definition: null,
+		x: center.left,
+		y: center.top
+	};
+	
+	for(; l_index < lines.length; l_index++) {
+		var line = lines[l_index];
+		
+		if(line[0] != '#') { //Skip comments
+			var props = line.match(/(?:[^\s"]+|"[^"]*")+/g);
+			
+			if(props[0] == '$Comp') {
+				
+			}
+			else if(props[0] == 'L') {
+				if(typeof this.libraries[props[1]] != 'undefined') {
+					comp.definition = this.libraries[props[1]];
+				}
+				else {
+					console.log('Unable to find definition for component: ', props[1]);
+				}
+			}
+			else if(props[0] == 'P') {
+				comp.x = props[1];
+				comp.y = props[2];
+			}
+			else if(props[0] == '$EndComp') {
+				break;
+			}
+		}
+	}
+	
+	if(comp.definition != null) {
+		comp.fabric = comp.definition.Create(center);
+		this.fcanvas.add(comp.fabric);
+		
+		comp.fabric.setLeft(comp.x);
+		comp.fabric.setTop(comp.y);
+	}
+
+	this.components.push(comp);
+	
+	return l_index;
+}
+
+EeSchema.prototype.parseLibrary = function(txt) {
+	var lines = txt.split('\n');
+	var block = '';
+	var section = '';
+
+	for(var l_index = 0; l_index < lines.length; l_index++) {
+		var line = lines[l_index];
+
+		if(line[0] != '#') { //Skip comments
+			var props = line.match(/(?:[^\s"]+|"[^"]*")+/g);
+			
+			if(props[0] == 'DEF') {
+				var def = new ComponentDefinition();
+				l_index += def.parse(lines.slice(l_index));
+				
+				this.libraries[def.name] = def;
+			}
+			else if(block != '') {
+				block += line;
+				
+				if(props[0] == 'ENDDEF') {
+					
+				}
+			}
+		}
+	}
 }
 
 EeSchema.prototype.zoomIn = function() {
@@ -68,8 +209,9 @@ EeSchema.prototype.zoomIn = function() {
 		var objects = this.fcanvas.getObjects();		
         this.canvasScale = this.canvasScale * this.SCALE_FACTOR;
 		var center = this.fcanvas.getCenter();
-		var x = $('#canvas').data('mouseX');
-		var y = $('#canvas').data('mouseY');
+		var x = this.canvas.data('mouseX');
+		var y = this.canvas.data('mouseY');
+		//this.resetView();
 
 		for (var i in objects) {
 			var scaleX = objects[i].scaleX;
@@ -97,8 +239,12 @@ EeSchema.prototype.zoomIn = function() {
 EeSchema.prototype.zoomOut = function() {
 		// TODO limit max cavas zoom out
 		
-		//console.log(canvas.getZoom());
-		//canvas.setZoom(canvas.getZoom() - SCALE_FACTOR);
+		/*console.log(this.fcanvas.getZoom());
+		this.fcanvas.setZoom(this.fcanvas.getZoom() - .01);
+		this.resetView();
+		this.fcanvas.renderAll();
+		return*/
+		
 		var objects = this.fcanvas.getObjects();		
 		this.canvasScale = this.canvasScale / this.SCALE_FACTOR;
 		var center = this.fcanvas.getCenter();
@@ -126,7 +272,7 @@ EeSchema.prototype.zoomOut = function() {
 	}
 	
 EeSchema.prototype.panHorizontal = function(steps) {
-		var objects = this.fcanvas.getObjects();
+		/*var objects = this.fcanvas.getObjects();
 		var step = this.PAN_STEP * steps;
 	
 		for (var i in objects) {
@@ -134,8 +280,10 @@ EeSchema.prototype.panHorizontal = function(steps) {
 			objects[i].setCoords();
 		}
 		
-		this.fcanvas.renderAll();
-	}
+		this.fcanvas.renderAll();*/
+		
+	this.fcanvas.relativePan(new fabric.Point(steps, 0));
+}
 	
 EeSchema.prototype.panVertical = function(steps) {
 		var objects = this.fcanvas.getObjects();
@@ -150,19 +298,23 @@ EeSchema.prototype.panVertical = function(steps) {
 	}
 	
 EeSchema.prototype.resetView = function() {
-	var objects = canvas.getObjects();
+	var objects = this.fcanvas.getObjects();
 		
-	/*var left = 10000;
-	var top = 10000;
-	var right = -10000;
-	var bottom = -10000;
-	var objects = canvas.getObjects();
-	
+	var left = 100000;
+	var top = 100000;
+	var right = -100000;
+	var bottom = -100000;
+
 	for(var i in objects) {
-		var oleft = objects[i].left;
-		var otop = objects[i].top;
-		var owidth = objects[i].width;
-		var oheight = objects[i].height;
+		if(typeof objects[i].lineType != 'undefined')
+			continue;
+
+		var rect = objects[i].getBoundingRect();
+		
+		var oleft = parseInt(objects[i].left);
+		var otop = parseInt(objects[i].top);
+		var owidth = parseInt(rect.width);
+		var oheight = parseInt(rect.height);
 	
 		if(oleft < left)
 			left = oleft;
@@ -175,25 +327,18 @@ EeSchema.prototype.resetView = function() {
 		
 		if(otop + oheight > bottom)
 			bottom = otop + oheight;
-			
-		objects[i].center();
 	}
 	
-	var cwidth = $('#canvas').width();
-	var cheight = $('#canvas').height();
+	var cwidth = this.canvas.width();
+	var cheight = this.canvas.height();
 	
-	console.log(left, ', ', top, ', ', right, ', ', ', ', bottom);
+	var x = left + (right - left)/2;
+	var y = top + (bottom - top)/2;
+	console.log(x, ', ', y);
+	this.fcanvas.absolutePan(new fabric.Point(x - cwidth/2, y - cheight/2));
+	//this.fcanvas.zoomToPoint(.8, new fabric.Point(x, y));
 	
-	canvas.renderAll();
+	this.fcanvas.renderAll();
+	
 	return;
-	//var height = (bottom - top)/2;
-	
-	console.log(shiftx);
-	
-	for (var i in objects) {
-		objects[i].left += shiftx;
-		objects[i].setCoords();
-	}
-	
-	canvas.renderAll();*/
 }
