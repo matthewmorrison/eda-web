@@ -1,20 +1,15 @@
 <!DOCTYPE html>
 <html>
 <head>
-	<script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/2.1.1/jquery.min.js" ></script> 
-	<script src="fabric.min.js" ></script>
-	<script src="rawgit.com/matthewmorrison/eda-web/master/src/eeschema-component.js"></script>
+	<script src="//cdnjs.cloudflare.com/ajax/libs/jquery/2.1.1/jquery.min.js" ></script> 
+	<script src="//cdnjs.cloudflare.com/ajax/libs/fabric.js/1.4.8/fabric.min.js" ></script>
+	<script src="//rawgit.com/matthewmorrison/eda-web/master/src/eeschema-component.js"></script>
 </head>
 <body>	
 	<div class="canvas-scroll">
-		<canvas id="canvas" style="border: 1px solid #888" />
+		<canvas id="canvas" style="border: 1px solid #888;" />
 	</div>
 	<script>
-
-	
-
-	
-	
 	
 		
 	function validatePropertyCount(count, min, max) {
@@ -93,7 +88,7 @@
 		//comp.draw();
 		
 		var scrolls = $('.canvas-scroll');
-		
+
 		scrolls.each(function(index, item) {
 			item = $(item);
 			var cvs = item.find('canvas');
