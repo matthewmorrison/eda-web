@@ -50,19 +50,54 @@
         });
     </script>
 
-	<style>		
+	<style>
         .eeschema {
             position: absolute;
             left: 0;
-			right: 0;
+            width: 100%;
 			top: 0;
 			bottom: 0;
+			overflow: hidden;
+			z-index: 50;
+        }
+        
+        .eeschema-canvas-scroller {
+            overflow-x: scroll;
+            position: absolute;
+            height: 40px;
+        }
+        
+        .eeschema-coords {
+            float: right;
+        }
+        
+        .eeschema canvas {
+            position: absolute;
+            margin: 1px 0;
+            height: 100%;
+        }
+        
+        .eeschema-canvas-zoomer {
+            position: absolute;
+            left: 0;
+            right: 20px;
+            top: 0;
+            bottom: 20px;
+            overflow-y: scroll;
+            overflow-x: visible;
+        }
+        
+        .eeschema-right-panel {
+            position: absolute;
+            width: 50px;
+            height: 80%;
+            background-color: red;
+            
         }
 	</style>
 </head>
 <body>	
 	<div class="eeschema">
-		<canvas id="canvas" />
 	</div>
 	<script>
 	
@@ -145,11 +180,6 @@
 		else {
 			ees.open('https://rawgithub.com/matthewmorrison/stereo-camera-board/master/kicad/stereo-camera-board.sch');
 		}
-		
-        //var comp = new Component(ees.fcanvas);
-	    //comp.parseComponent(mpu);
-	    //console.log(comp);
-	    //comp.draw(); 
 	}
 	</script>
 	
