@@ -58,6 +58,7 @@ function EeSchema(container) {
 		var e = obj.e;	
 		ees.canvas.data('mouseX', e.clientX);
 		ees.canvas.data('mouseY', e.clientY);
+		ees.coords.html(e.clientX + ', ' + e.clientY);
 	});
 	
 	this.container.append(this.rightPanel);
@@ -84,12 +85,23 @@ function getScrollbarWidth() {
     });
 });*/
 
+function jsonpTest(data) {
+    console.log('in test');
+    console.log(data);
+}
+
 EeSchema.prototype.open = function(location) {
     this.url = location;
 
-	$.ajax(location)
+	$.ajax({
+	    dataType: 'jsonp',
+	    url: location,
+	    contentType: 'text/plain',
+	    jsonpCallback: 'jsonpTest',
+	    success: function() { console.log('success'); }
+	})
 	.done(function(response) {
-		console.log(response);
+		console.log('Response: ', response);
 		this.parseSchematic(response);
 	});
 }
