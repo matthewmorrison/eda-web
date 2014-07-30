@@ -85,6 +85,8 @@ function getScrollbarWidth() {
 });*/
 
 EeSchema.prototype.open = function(location) {
+    this.url = location;
+
 	$.ajax(location)
 	.done(function(response) {
 		console.log(response);
@@ -103,7 +105,17 @@ EeSchema.prototype.parseSchematic = function(txt) {
 			var props = line.match(/(?:[^\s"]+|"[^"]*")+/g);
 			
 			if(props[0].indexOf('LIBS:') == 0 && !this.localMode) {
-				console.log('Load-', props[0].substring(5));
+			    var file = props[0].substring(5);
+				console.log('Load-', file);
+				
+				var path = this.location.substring(0, this.location.lastIndexOf('/')) + '/' + file;
+				
+				console.log('fetch: ' + path);
+				
+				$.ajax(path)
+				.done(function(response) {
+				    this.parseLibrary(response);
+				});
 			}
 			else if(props[0] == '$Comp') {
 				l_index += this.parseComponent(lines.slice(l_index));
