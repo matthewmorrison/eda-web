@@ -5,7 +5,7 @@ function EeSchema(container) {
 	this.SCALE_FACTOR = 1.2;
 	this.PAN_STEP = 1.1;
 	this.canvasPan = [0, 0];
-	this.scroller = $('<div class="eeschema-canvas-scroller" />');
+	this.panner = $('<div class="eeschema-canvas-panner" />');
 	this.zoomer = $('<div class="eeschema-canvas-zoomer"><canvas /></div>');
 	this.sizer = $('<div class="eeschema-canvas-sizer" />');
 	this.localMode = false;
@@ -20,9 +20,9 @@ function EeSchema(container) {
 	var ees = this;
 	container = this.container;
 	
-	this.container.append(this.scroller);
-	this.scroller.append(this.sizer);
-	this.scroller.append(this.zoomer);
+	this.container.append(this.panner);
+	this.panner.append(this.sizer);
+	this.panner.append(this.zoomer);
     this.zoomer.append(this.canvas);
 	
 	this.container.append(this.rightPanel);
@@ -32,7 +32,7 @@ function EeSchema(container) {
 	
 	this.fcanvas = new fabric.Canvas(this.canvas.get(0));
 
-	this.fcanvas.setWidth(this.zoomer.width() - 100);
+	this.fcanvas.setWidth(this.zoomer.width() - 10);
 	this.fcanvas.setHeight(this.zoomer.height());
 	
 	this.zoomer.on('scroll', function(e) {
@@ -40,36 +40,42 @@ function EeSchema(container) {
 	    zoomer = $(this);
 		var scroll = zoomer.scrollTop();
 		
-		if(e.ctrlKey) {
-			ees.panHorizontal(1 - scroll);
-		}
-		else if(e.altKey) {
-			ees.panVertical(1 - scroll);
-		}
-		else if(scroll < 1000) {	
+		if(scroll < 1000) {	
 			ees.zoomIn();
 		}
 		else if(scroll > 1000) {
 			ees.zoomOut();
 		}
 		
+		console.log('zoom: ', ees.canvasScale);
+		
 		zoomer.scrollTop(1000);
 	});
 	
-	this.scroller.on('scroll', function(e) {
-		var scroller = $(this);
-		ees.zoomer.css('left', scroller.scrollLeft());
-		ees.zoomer.css('top', scroller.scrollTop());
+	this.panner.on('scroll', function(e) {
+		var panner = $(this);
+		
+		var left = panner.scrollLeft();
+		var top = panner.scrollTop();
+		
+		console.log(left, ees.canvasScale * ees.sheetWidth, ees.fcanvas.getWidth());
+		
+		if(left < ees.canvasScale * ees.sheetWidth - ees.fcanvas.getWidth())
+			ees.zoomer.css('left', left);
+			
+		if(top < ees.canvasScale * ees.sheetHeight - ees.fcanvas.getHeight())
+			ees.zoomer.css('top', panner.scrollTop());
+			
+		ees.updatePan();
 	});
 
 	this.zoomer.scrollTop(1000);
-
-			//resetView();
+	
 	this.fcanvas.on('mouse:move', function(obj) {
 		var e = obj.e;	
 		ees.canvas.data('mouseX', e.clientX);
 		ees.canvas.data('mouseY', e.clientY);
-		ees.coords.html(e.clientX + ', ' + e.clientY);
+		ees.coords.html(((e.clientX + ees.panner.scrollLeft()) * 1/ees.canvasScale) + ', ' + ((e.clientY + ees.panner.scrollTop()) * 1/ees.canvasScale));
 	});
 }
 
@@ -93,11 +99,6 @@ function getScrollbarWidth() {
         $(item).data('eeschema', ees);
     });
 });*/
-
-function jsonpTest(data) {
-    console.log('in test');
-    console.log(data);
-}
 
 EeSchema.prototype.open = function(location) {
     this.url = location;
@@ -163,7 +164,7 @@ EeSchema.prototype.parseSchematic = function(txt) {
 				wire.x1 = props[2];
 				wire.y1 = props[3];
 
-				var l = new fabric.Line([ wire.x0, wire.y0, wire.x1, wire.y1 ], {
+				var l = new fabric.Line([ /*wire.x0, wire.y0,*/ 0, 0, wire.x1, wire.y1 ], {
 					stroke: 'black',
 					strokeWidth: 1,
 					left: wire.x0,
@@ -180,6 +181,14 @@ EeSchema.prototype.parseSchematic = function(txt) {
 		}
 	}
 	
+	//this.zoomOut();
+	//this.zoomOut();
+	//this.zoomOut();
+	//this.zoomOut();
+	
+	this.sizer.width(this.canvasScale * this.sheetWidth);
+	this.sizer.height(this.canvasScale * this.sheetHeight);
+	console.log('done parsing schematic');
 	//this.resetView();
 }
 
@@ -211,8 +220,9 @@ EeSchema.prototype.parseComponent = function(lines) {
 				}
 			}
 			else if(props[0] == 'P') {
-				comp.x = props[1];
-				comp.y = props[2];
+				comp.x = props[1]/1;
+				comp.y = props[2]/1;
+				console.log(comp.x, ', ', comp.y);
 			}
 			else if(props[0] == '$EndComp') {
 				break;
@@ -223,7 +233,7 @@ EeSchema.prototype.parseComponent = function(lines) {
 	if(comp.definition != null) {
 		comp.fabric = comp.definition.Create(center);
 		this.fcanvas.add(comp.fabric);
-		
+		console.log('pos: ', comp.x, comp.y);
 		comp.fabric.setLeft(comp.x);
 		comp.fabric.setTop(comp.y);
 	}
@@ -264,14 +274,21 @@ EeSchema.prototype.parseLibrary = function(txt) {
 EeSchema.prototype.zoomIn = function() {
 		// TODO limit the max canvas zoom in
 		//console.log(canvas.getZoom());
-		//canvas.setZoom(canvas.getZoom()+SCALE_FACTOR);
 
-		var objects = this.fcanvas.getObjects();		
+		var x = this.canvas.data('mouseX');
+		var y = this.canvas.data('mouseY');
+		
+		this.fcanvas.zoomToPoint(new fabric.Point(x, y), this.fcanvas.getZoom() * this.SCALE_FACTOR);
+		this.fcanvas.renderAll();
+		/*var objects = this.fcanvas.getObjects();		
         this.canvasScale = this.canvasScale * this.SCALE_FACTOR;
 		var center = this.fcanvas.getCenter();
 		var x = this.canvas.data('mouseX');
 		var y = this.canvas.data('mouseY');
 		//this.resetView();
+		
+		panX = x * .2;
+		panY = y * .2;
 
 		for (var i in objects) {
 			var scaleX = objects[i].scaleX;
@@ -281,8 +298,12 @@ EeSchema.prototype.zoomIn = function() {
 
 			var tempScaleX = scaleX * this.SCALE_FACTOR;
 			var tempScaleY = scaleY * this.SCALE_FACTOR;
-			var tempLeft = left * this.SCALE_FACTOR - x * .2;
-			var tempTop = top * this.SCALE_FACTOR - y * .2;
+			//var tempLeft = left * this.SCALE_FACTOR - panX;
+			//var tempTop = top * this.SCALE_FACTOR - panY;
+			var tempLeft = left * this.SCALE_FACTOR;
+			var tempTop = top * this.SCALE_FACTOR;
+			//var tempLeft = left * this.SCALE_FACTOR - this.panner.scrollLeft() * (.2 / this.SCALE_FACTOR);
+			//var tempTop = top * this.SCALE_FACTOR;
 			
 			objects[i].scaleX = tempScaleX;
 			objects[i].scaleY = tempScaleY;
@@ -292,22 +313,30 @@ EeSchema.prototype.zoomIn = function() {
 			objects[i].setCoords();
 		}
 			
-		this.fcanvas.renderAll();
+		this.fcanvas.renderAll();*/
+		
+		//this.panner.scrollLeft(this.panner.scrollLeft() * this.SCALE_FACTOR - panX);
+		
+		//this.updatePan();
 }
 
 	// Zoom Out
 EeSchema.prototype.zoomOut = function() {
 		// TODO limit max cavas zoom out
 		
-		/*console.log(this.fcanvas.getZoom());
-		this.fcanvas.setZoom(this.fcanvas.getZoom() - .01);
-		this.resetView();
-		this.fcanvas.renderAll();
-		return*/
+		//this.fcanvas.zoomToPoint(new fabric.Point(4650, 3750), this.fcanvas.getZoom() * (1 / this.SCALE_FACTOR));
 		
-		var objects = this.fcanvas.getObjects();		
+		var center = this.fcanvas.getCenter();
+		this.fcanvas.zoomToPoint(new fabric.Point(center.left, center.top), this.fcanvas.getZoom() * (1 / this.SCALE_FACTOR));
+		this.fcanvas.renderAll();
+		//this.resetView();
+		
+		/*var objects = this.fcanvas.getObjects();		
 		this.canvasScale = this.canvasScale / this.SCALE_FACTOR;
 		var center = this.fcanvas.getCenter();
+		
+		var scrollX = this.panner.scrollLeft();
+		var scrollY = this.panner.scrollTop();
 
 		for (var i in objects) {
 			var scaleX = objects[i].scaleX;
@@ -317,8 +346,12 @@ EeSchema.prototype.zoomOut = function() {
 		
 			var tempScaleX = scaleX * (1 / this.SCALE_FACTOR);
 			var tempScaleY = scaleY * (1 / this.SCALE_FACTOR);
-			var tempLeft = left * (1 / this.SCALE_FACTOR) + center.left * (.2 / this.SCALE_FACTOR);
-			var tempTop = top * (1 / this.SCALE_FACTOR) + center.top * (.2 / this.SCALE_FACTOR);
+			var tempLeft = left * (1 / this.SCALE_FACTOR);
+			var tempTop = top * (1 / this.SCALE_FACTOR);
+			//var tempLeft = left * (1 / this.SCALE_FACTOR) + center.left* (.2 / this.SCALE_FACTOR);
+			//var tempTop = top * (1 / this.SCALE_FACTOR) + center.top * (.2 / this.SCALE_FACTOR);
+			//var tempLeft = left * (1 / this.SCALE_FACTOR) + this.panner.scrollLeft() * (.2 / this.SCALE_FACTOR);
+			//var tempTop = top * (1 / this.SCALE_FACTOR);
 			
 			objects[i].scaleX = tempScaleX;
 			objects[i].scaleY = tempScaleY;
@@ -328,77 +361,89 @@ EeSchema.prototype.zoomOut = function() {
 			objects[i].setCoords();
 		}
 		
-		this.fcanvas.renderAll();
-	}
-	
-EeSchema.prototype.panHorizontal = function(steps) {
-		/*var objects = this.fcanvas.getObjects();
-		var step = this.PAN_STEP * steps;
-	
-		for (var i in objects) {
-			objects[i].left += step;
-			objects[i].setCoords();
-		}
-		
 		this.fcanvas.renderAll();*/
 		
-	this.fcanvas.relativePan(new fabric.Point(steps, 0));
+		//this.updatePan();
 }
-	
-EeSchema.prototype.panVertical = function(steps) {
-		var objects = this.fcanvas.getObjects();
-		var step = this.PAN_STEP * steps;
-	
-		for (var i in objects) {
-			objects[i].top += step;
-			objects[i].setCoords();
-		}
-		
-        this.fcanvas.renderAll();
-	}
-	
-EeSchema.prototype.resetView = function() {
-	var objects = this.fcanvas.getObjects();
-		
-	var left = 100000;
-	var top = 100000;
-	var right = -100000;
-	var bottom = -100000;
 
-	for(var i in objects) {
-		if(typeof objects[i].lineType != 'undefined')
-			continue;
+EeSchema.prototype.updatePan = function() {	
+	var sLeft = this.panner.scrollLeft();
+	var sTop = this.panner.scrollTop();
+	var zoom = this.fcanvas.getZoom();
+	
+	var x = sLeft;
+	var y = sTop;
+	
+	console.log('update pan: {0},{1}', x, y);
+	
+	this.fcanvas.absolutePan(new fabric.Point(x, y));
+	
+	this.zoomer.css('left', sLeft);
+	this.zoomer.css('top', sTop);
 
-		var rect = objects[i].getBoundingRect();
-		
-		var oleft = parseInt(objects[i].left);
-		var otop = parseInt(objects[i].top);
-		var owidth = parseInt(rect.width);
-		var oheight = parseInt(rect.height);
-	
-		if(oleft < left)
-			left = oleft;
-		
-		if(owidth + oleft > right)
-			right = owidth + oleft;
-		
-		if(otop < top)
-			top = otop;
-		
-		if(otop + oheight > bottom)
-			bottom = otop + oheight;
-	}
-	
-	var cwidth = this.canvas.width();
-	var cheight = this.canvas.height();
-	
-	var x = left + (right - left)/2;
-	var y = top + (bottom - top)/2;
-	console.log(x, ', ', y);
-	this.fcanvas.absolutePan(new fabric.Point(x - cwidth/2, y - cheight/2));
-	//this.fcanvas.zoomToPoint(.8, new fabric.Point(x, y));
+	this.sizer.width(zoom * this.sheetWidth);
+	this.sizer.height(zoom * this.sheetWidth);
 	
 	this.fcanvas.renderAll();
 	
-	return;
+	/*this.sizer.width(this.canvasScale * this.sheetWidth);
+	this.sizer.height(this.canvasScale * this.sheetWidth);
+	
+	var sTop = this.panner.scrollTop();
+	var sLeft = this.panner.scrollLeft();
+	var objects = this.fcanvas.getObjects();
+	
+	for (var i in objects) {
+		var scaleX = objects[i].scaleX;
+		var scaleY = objects[i].scaleY;
+		var left = objects[i].left;
+		var top = objects[i].top;
+
+		var tempLeft = left + this.canvasPan[0] - sLeft;
+		var tempTop = top + this.canvasPan[1] - sTop;
+		
+		objects[i].left = tempLeft;
+		objects[i].top = tempTop;
+		
+		objects[i].setCoords();
+	}
+	
+	this.canvasPan[0] = sLeft;
+	this.canvasPan[1] = sTop;
+			
+	this.fcanvas.renderAll();*/
+}
+
+EeSchema.prototype.recalcScroll = function() {
+	var dwidth = this.fcanvas.getWidth()/this.sheetWidth;
+	var dheight = this.fcanvas.getHeight()/this.sheetHeight;
+}
+	
+EeSchema.prototype.resetView = function() {
+	var objects = this.fcanvas.getObjects();
+    for (var i in objects) {
+        var scaleX = objects[i].scaleX;
+        var scaleY = objects[i].scaleY;
+        var left = objects[i].left;
+        var top = objects[i].top;
+    
+        var tempScaleX = (scaleX - this.canvasPan[0]) * (1 / this.canvasScale);
+        var tempScaleY = (scaleY - this.canvasPan[1]) * (1 / this.canvasScale);
+        var tempLeft = left * (1 / this.canvasScale);
+        var tempTop = top * (1 / this.canvasScale);
+
+        objects[i].scaleX = tempScaleX;
+        objects[i].scaleY = tempScaleY;
+        objects[i].left = tempLeft;
+        objects[i].top = tempTop;
+
+        objects[i].setCoords();
+    }
+    
+	this.panner.scrollLeft(0);
+	this.panner.scrollTop(0);
+	
+    this.fcanvas.renderAll();
+    
+    this.canvasScale = 1;
 }
