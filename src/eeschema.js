@@ -5,27 +5,32 @@ function EeSchema(container) {
 	this.SCALE_FACTOR = 1.2;
 	this.PAN_STEP = 1.1;
 	this.canvasPan = [0, 0];
-	this.hScroller = $('<div class="eeschema-canvas-scroller" />');
+	this.scroller = $('<div class="eeschema-canvas-scroller" />');
 	this.zoomer = $('<div class="eeschema-canvas-zoomer"><canvas /></div>');
-	this.coords = $('<div class="eeschema-coords" >Coords</div>');
-	this.hScroller.append(this.coords);
+	this.sizer = $('<div class="eeschema-canvas-sizer" />');
 	this.localMode = false;
 	this.libraries = {};
 	this.components = [];
-	this.wires = []; // and busses
+	this.wires = []; // and buses
 	this.junctions = [];
-	this.rightPanel = $('<div class="eeschema-right-panel" />');
+	this.rightPanel = $('<div class="eeschema-panel-right" />');
+	this.bottomPanel = $('<div class="eeschema-panel-bottom" />');
+	this.coords = $('<div class="eeschema-coords" >Coords</div>');
 	
 	var ees = this;
 	container = this.container;
 	
-	this.container.append(this.zoomer);
+	this.container.append(this.scroller);
+	this.scroller.append(this.sizer);
+	this.scroller.append(this.zoomer);
     this.zoomer.append(this.canvas);
 	
+	this.container.append(this.rightPanel);
+	
+	this.container.append(this.bottomPanel);
+	this.bottomPanel.append(this.coords);
+	
 	this.fcanvas = new fabric.Canvas(this.canvas.get(0));
-
-	$(document.body).append(this.hScroller);
-	this.hScroller.css({ left: this.canvas.css('left'), 'top': this.zoomer.position().top + this.zoomer.height(), 'width': this.zoomer.width() });
 
 	this.fcanvas.setWidth(this.zoomer.width() - 100);
 	this.fcanvas.setHeight(this.zoomer.height());
@@ -41,17 +46,23 @@ function EeSchema(container) {
 		else if(e.altKey) {
 			ees.panVertical(1 - scroll);
 		}
-		else if(scroll < 1) {	
+		else if(scroll < 1000) {	
 			ees.zoomIn();
 		}
-		else if(scroll > 1) {
+		else if(scroll > 1000) {
 			ees.zoomOut();
 		}
 		
-		zoomer.scrollTop(1);
+		zoomer.scrollTop(1000);
+	});
+	
+	this.scroller.on('scroll', function(e) {
+		var scroller = $(this);
+		ees.zoomer.css('left', scroller.scrollLeft());
+		ees.zoomer.css('top', scroller.scrollTop());
 	});
 
-	this.zoomer.scrollTop(1);
+	this.zoomer.scrollTop(1000);
 
 			//resetView();
 	this.fcanvas.on('mouse:move', function(obj) {
@@ -60,8 +71,6 @@ function EeSchema(container) {
 		ees.canvas.data('mouseY', e.clientY);
 		ees.coords.html(e.clientX + ', ' + e.clientY);
 	});
-	
-	this.container.append(this.rightPanel);
 }
 
 function getScrollbarWidth() {
@@ -128,6 +137,11 @@ EeSchema.prototype.parseSchematic = function(txt) {
 				.done(function(response) {
 				    this.parseLibrary(response);
 				});
+			}
+			else if(props[0] == '$Descr') {
+				this.sheetSize = props[1];
+				this.sheetWidth = props[2];
+				this.sheetHeight = props[3];
 			}
 			else if(props[0] == '$Comp') {
 				l_index += this.parseComponent(lines.slice(l_index));
@@ -256,7 +270,7 @@ EeSchema.prototype.zoomIn = function() {
         this.canvasScale = this.canvasScale * this.SCALE_FACTOR;
 		var center = this.fcanvas.getCenter();
 		var x = this.canvas.data('mouseX');
-		var y = this.canvas.data('mouseY');console.log(x, ', ', y);
+		var y = this.canvas.data('mouseY');
 		//this.resetView();
 
 		for (var i in objects) {
@@ -279,7 +293,7 @@ EeSchema.prototype.zoomIn = function() {
 		}
 			
 		this.fcanvas.renderAll();
-	}
+}
 
 	// Zoom Out
 EeSchema.prototype.zoomOut = function() {
