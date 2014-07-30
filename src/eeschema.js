@@ -1,28 +1,39 @@
 function EeSchema(container) {
     this.container = $(container);
-    this.canvas = this.container.find('canvas');	
-	this.fcanvas = new fabric.Canvas(this.canvas.get(0));
+    this.canvas = $('<canvas />');	
 	this.canvasScale = 1;
 	this.SCALE_FACTOR = 1.2;
 	this.PAN_STEP = 1.1;
 	this.canvasPan = [0, 0];
-	this.hScroller = $('<div style="overflow-x: scroll; position: absolute" />');
+	this.hScroller = $('<div class="eeschema-canvas-scroller" />');
+	this.zoomer = $('<div class="eeschema-canvas-zoomer"><canvas /></div>');
+	this.coords = $('<div class="eeschema-coords" >Coords</div>');
+	this.hScroller.append(this.coords);
 	this.localMode = false;
 	this.libraries = {};
 	this.components = [];
 	this.wires = []; // and busses
 	this.junctions = [];
-	
-	this.fcanvas.setWidth(this.container.width());
-	this.fcanvas.setHeight(this.container.height());
+	this.rightPanel = $('<div class="eeschema-right-panel" />');
 	
 	var ees = this;
 	container = this.container;
-	this.container.css({ 'height': this.canvas.css('height') - 2, 'overflow-y': 'scroll' });
-	this.container.on('scroll', function(e) {
+	
+	this.container.append(this.zoomer);
+    this.zoomer.append(this.canvas);
+	
+	this.fcanvas = new fabric.Canvas(this.canvas.get(0));
+
+	$(document.body).append(this.hScroller);
+	this.hScroller.css({ left: this.canvas.css('left'), 'top': this.zoomer.position().top + this.zoomer.height(), 'width': this.zoomer.width() });
+
+	this.fcanvas.setWidth(this.zoomer.width() - 100);
+	this.fcanvas.setHeight(this.zoomer.height());
+	
+	this.zoomer.on('scroll', function(e) {
 		e.preventDefault();
-		
-		var scroll = container.scrollTop();
+	    zoomer = $(this);
+		var scroll = zoomer.scrollTop();
 		
 		if(e.ctrlKey) {
 			ees.panHorizontal(1 - scroll);
@@ -37,22 +48,33 @@ function EeSchema(container) {
 			ees.zoomOut();
 		}
 		
-		container.scrollTop(1);
+		zoomer.scrollTop(1);
 	});
 
-	this.container.scrollTop(1);
-	
-	
-	$(document.body).append(this.hScroller);
-	this.hScroller.css({ left: this.container.css('left'), 'height': '20px', 'top': this.container.position().top + this.container.height(), 'width': this.canvas.width() });
-			
+	this.zoomer.scrollTop(1);
+
 			//resetView();
 	this.fcanvas.on('mouse:move', function(obj) {
-		var e = obj.e;
+		var e = obj.e;	
 		ees.canvas.data('mouseX', e.clientX);
 		ees.canvas.data('mouseY', e.clientY);
 	});
+	
+	this.container.append(this.rightPanel);
 }
+
+function getScrollbarWidth() {
+  var div, body, W = window.browserScrollbarWidth;
+  if (W === undefined) {
+    body = document.body, div = document.createElement('div');
+    div.innerHTML = '<div style="width: 50px; height: 50px; position: absolute; left: -100px; top: -100px; overflow: auto;"><div style="width: 1px; height: 100px;"></div></div>';
+    div = div.firstChild;
+    body.appendChild(div);
+    W = window.browserScrollbarWidth = div.offsetWidth - div.clientWidth;
+    body.removeChild(div);
+  }
+  return W;
+};
 
 /*$(function() {
     $('.eeschema').each(function(index, item) {
@@ -210,7 +232,7 @@ EeSchema.prototype.zoomIn = function() {
         this.canvasScale = this.canvasScale * this.SCALE_FACTOR;
 		var center = this.fcanvas.getCenter();
 		var x = this.canvas.data('mouseX');
-		var y = this.canvas.data('mouseY');
+		var y = this.canvas.data('mouseY');console.log(x, ', ', y);
 		//this.resetView();
 
 		for (var i in objects) {
