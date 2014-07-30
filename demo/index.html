@@ -191,15 +191,15 @@
 		
 	    var ees = new EeSchema($('.eeschema').first().get(0));
 		
-		if(window.location.host == 'localhost' || window.location.protocol == 'file:') {
+//		if(window.location.host == 'localhost' || window.location.protocol == 'file:') {
 			ees.localMode = true;
 			ees.parseLibrary(stereo_camera_board);
 			ees.parseSchematic(sch);
-		}
-		else {
-			ees.open('https://rawgit.com/matthewmorrison/stereo-camera-board/master/kicad/stereo-camera-board.sch');
-		}
-	}
+//		}
+//		else {
+//			ees.open('https://rawgit.com/matthewmorrison/stereo-camera-board/master/kicad/stereo-camera-board.sch');
+//		}
+//	}
 	</script>
 	
 	<script>
