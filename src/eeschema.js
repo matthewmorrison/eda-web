@@ -17,6 +17,7 @@ function EeSchema(container) {
 	this.testButton = $('<input type="button" value="Test" />');
 	this.bottomPanel = $('<div class="eeschema-panel-bottom" />');
 	this.coords = $('<div class="eeschema-coords" >Coords</div>');
+	this.dragStatus = 'none';
 	
 	var ees = this;
 	container = this.container;
@@ -82,8 +83,24 @@ function EeSchema(container) {
 
 	this.zoomer.scrollTop(1000);
 	
-	this.fcanvas.on('mouse:drag', function(obj) {
-	    console.log('drag');
+	this.fcanvas.on('mouse:down', function(obj) {
+		var dragHandle = function(obj) {
+			ees.canvasDrag(obj.e);
+		}
+	
+	    $(window).on('mousemove', '', dragHandle);
+		
+		ees.dragStatus = 'start';
+		ees.dragStart = [obj.e.clientX, obj.e.clientY];
+		ees.dragPanStart = [ees.fcanvas.viewportTransform[4], ees.fcanvas.viewportTransform[5]];
+		
+		var upEv = $(window).one({
+			mouseup: function() {
+				ees.dragStatus = 'none';
+				$(window).off('mousemove', '', dragHandle);
+				ees.updatePan();
+			}
+		});
 	});
 	
 	this.fcanvas.on('mouse:move', function(obj) {
@@ -95,6 +112,16 @@ function EeSchema(container) {
 		
 		ees.coords.html((e.clientX/zoom - ees.fcanvas.viewportTransform[4]/zoom) + ', ' + (e.clientY/zoom - ees.fcanvas.viewportTransform[5]/zoom));
 	});
+}
+
+EeSchema.prototype.canvasDrag = function(e) {
+	if(this.dragStatus != 'dragging')
+		this.dragStatus = 'dragging';
+	
+	var x = this.dragStart[0] - this.fcanvas.mouseX  - this.dragPanStart[0];
+	var y = this.dragStart[1] - this.fcanvas.mouseY - this.dragPanStart[1];
+		
+	this.fcanvas.absolutePan(new fabric.Point(x, y));
 }
 
 function getScrollbarWidth() {
