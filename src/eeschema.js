@@ -39,7 +39,7 @@ function EeSchema(container) {
 	
 	this.fcanvas = new fabric.Canvas(this.canvas.get(0));
 	
-	this.fcanvas.allowTouchScrolling = true;
+	//this.fcanvas.allowTouchScrolling = true;
 
 	this.fcanvas.setWidth(this.zoomer.width() - 10);
 	this.fcanvas.setHeight(this.zoomer.height());
