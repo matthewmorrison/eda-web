@@ -14,6 +14,7 @@ function EeSchema(container) {
 	this.wires = []; // and buses
 	this.junctions = [];
 	this.rightPanel = $('<div class="eeschema-panel-right" />');
+	this.testButton = $('<input type="button" value="Test" />');
 	this.bottomPanel = $('<div class="eeschema-panel-bottom" />');
 	this.coords = $('<div class="eeschema-coords" >Coords</div>');
 	
@@ -26,6 +27,13 @@ function EeSchema(container) {
     this.zoomer.append(this.canvas);
 	
 	this.container.append(this.rightPanel);
+	this.rightPanel.append(this.testButton);
+	this.testButton.on('click', function() {
+	    var t = ees.libraries['MPU-9250'].Create(ees.fcanvas.getCenter());
+		ees.fcanvas.add(t);
+//		t.setLeft(this.fab);
+//		t.setTop(comp.y);    
+	});
 	
 	this.container.append(this.bottomPanel);
 	this.bottomPanel.append(this.coords);
@@ -47,35 +55,46 @@ function EeSchema(container) {
 			ees.zoomOut();
 		}
 		
-		console.log('zoom: ', ees.canvasScale);
-		
 		zoomer.scrollTop(1000);
 	});
 	
 	this.panner.on('scroll', function(e) {
+	    console.log(e);
 		var panner = $(this);
 		
 		var left = panner.scrollLeft();
 		var top = panner.scrollTop();
 		
-		console.log(left, ees.canvasScale * ees.sheetWidth, ees.fcanvas.getWidth());
-		
-		if(left < ees.canvasScale * ees.sheetWidth - ees.fcanvas.getWidth())
+		//if(left < ees.canvasScale * ees.sheetWidth - ees.fcanvas.getWidth())
 			ees.zoomer.css('left', left);
 			
-		if(top < ees.canvasScale * ees.sheetHeight - ees.fcanvas.getHeight())
-			ees.zoomer.css('top', panner.scrollTop());
-			
-		ees.updatePan();
+		//if(top < ees.canvasScale * ees.sheetHeight - ees.fcanvas.getHeight())
+			ees.zoomer.css('top', top);
+		
+		if(ees.fcanvas.viewportTransform[4] > 0)
+		    left -= ees.fcanvas.viewportTransform[4];
+		    
+		if(ees.fcanvas.viewportTransform[5] > 0)
+		    top -= ees.fcanvas.viewportTransform[5];
+		
+	    ees.fcanvas.absolutePan(new fabric.Point(left, top));
+	    
+	    ees.updatePan();
 	});
 
 	this.zoomer.scrollTop(1000);
+	
+	this.fcanvas.on('mouse:drag', function(obj) {
+	    console.log('drag');
+	});
 	
 	this.fcanvas.on('mouse:move', function(obj) {
 		var e = obj.e;	
 		ees.canvas.data('mouseX', e.clientX);
 		ees.canvas.data('mouseY', e.clientY);
-		ees.coords.html(((e.clientX + ees.panner.scrollLeft()) * 1/ees.canvasScale) + ', ' + ((e.clientY + ees.panner.scrollTop()) * 1/ees.canvasScale));
+		var zoom = ees.fcanvas.getZoom();
+		//ees.coords.html(((e.clientX + ees.fcanvas.viewportTransform[5]) * 1/zoom) + ', ' + ((e.clientY + ees.panner.scrollTop()) * 1/zoom));
+		ees.coords.html(e.clientX + ', ' + e.clientY);
 	});
 }
 
@@ -222,7 +241,6 @@ EeSchema.prototype.parseComponent = function(lines) {
 			else if(props[0] == 'P') {
 				comp.x = props[1]/1;
 				comp.y = props[2]/1;
-				console.log(comp.x, ', ', comp.y);
 			}
 			else if(props[0] == '$EndComp') {
 				break;
@@ -233,7 +251,6 @@ EeSchema.prototype.parseComponent = function(lines) {
 	if(comp.definition != null) {
 		comp.fabric = comp.definition.Create(center);
 		this.fcanvas.add(comp.fabric);
-		console.log('pos: ', comp.x, comp.y);
 		comp.fabric.setLeft(comp.x);
 		comp.fabric.setTop(comp.y);
 	}
@@ -279,7 +296,8 @@ EeSchema.prototype.zoomIn = function() {
 		var y = this.canvas.data('mouseY');
 		
 		this.fcanvas.zoomToPoint(new fabric.Point(x, y), this.fcanvas.getZoom() * this.SCALE_FACTOR);
-		this.fcanvas.renderAll();
+        console.log(this.fcanvas.getZoom(), this.fcanvas.viewportTransform);
+		
 		/*var objects = this.fcanvas.getObjects();		
         this.canvasScale = this.canvasScale * this.SCALE_FACTOR;
 		var center = this.fcanvas.getCenter();
@@ -317,7 +335,7 @@ EeSchema.prototype.zoomIn = function() {
 		
 		//this.panner.scrollLeft(this.panner.scrollLeft() * this.SCALE_FACTOR - panX);
 		
-		//this.updatePan();
+		this.updatePan(true);
 }
 
 	// Zoom Out
@@ -328,7 +346,8 @@ EeSchema.prototype.zoomOut = function() {
 		
 		var center = this.fcanvas.getCenter();
 		this.fcanvas.zoomToPoint(new fabric.Point(center.left, center.top), this.fcanvas.getZoom() * (1 / this.SCALE_FACTOR));
-		this.fcanvas.renderAll();
+        console.log(this.fcanvas.getZoom(), this.fcanvas.getPointer(), this.fcanvas.viewportTransform);
+		console.log(this.fcanvas);
 		//this.resetView();
 		
 		/*var objects = this.fcanvas.getObjects();		
@@ -363,28 +382,34 @@ EeSchema.prototype.zoomOut = function() {
 		
 		this.fcanvas.renderAll();*/
 		
-		//this.updatePan();
+		this.updatePan(true);
 }
 
-EeSchema.prototype.updatePan = function() {	
-	var sLeft = this.panner.scrollLeft();
-	var sTop = this.panner.scrollTop();
+EeSchema.prototype.updatePan = function(allowOverPan) {
 	var zoom = this.fcanvas.getZoom();
-	
-	var x = sLeft;
-	var y = sTop;
-	
-	console.log('update pan: {0},{1}', x, y);
-	
-	this.fcanvas.absolutePan(new fabric.Point(x, y));
-	
-	this.zoomer.css('left', sLeft);
-	this.zoomer.css('top', sTop);
+	var zoomW = zoom * this.sheetWidth;
+    var zoomH = zoom * this.sheetHeight;
+    console.log('update pan ', this.fcanvas.viewportTransform);
+    
+//    zoomW += Math.abs(this.fcanvas.viewportTransform[4]);
+//    zoomH += Math.abs(this.fcanvas.viewportTransform[5]);
+    
+    if(allowOverPan) {
+	    if(this.fcanvas.viewportTransform[4] < 0)
+	        zoomW -= this.fcanvas.viewportTransform[4];
 
-	this.sizer.width(zoom * this.sheetWidth);
-	this.sizer.height(zoom * this.sheetWidth);
+        if(this.fcanvas.viewportTransform[5] < 0)
+            zoomH -= this.fcanvas.viewportTransform[5];
+    }
+
+	this.sizer.width(zoomW);
+	this.sizer.height(zoomH);
 	
-	this.fcanvas.renderAll();
+	this.panner.scrollLeft(-1 * this.fcanvas.viewportTransform[4]);
+	this.panner.scrollTop(-1 * this.fcanvas.viewportTransform[5]);
+	
+	this.zoomer.css('left', this.panner.scrollLeft());
+	this.zoomer.css('top', this.panner.scrollTop());
 	
 	/*this.sizer.width(this.canvasScale * this.sheetWidth);
 	this.sizer.height(this.canvasScale * this.sheetWidth);
