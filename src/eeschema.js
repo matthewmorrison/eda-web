@@ -447,4 +447,6 @@ EeSchema.prototype.resetView = function() {
 	var center = this.fcanvas.getCenter();
 	this.fcanvas.panAbsoltue(center.left, center.top);
 	this.fcanvas.setZoom(1);
+	
+	this.updatePan(true);
 }
