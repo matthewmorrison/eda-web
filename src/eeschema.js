@@ -29,10 +29,9 @@ function EeSchema(container) {
 	this.container.append(this.rightPanel);
 	this.rightPanel.append(this.testButton);
 	this.testButton.on('click', function() {
-	    var t = ees.libraries['MPU-9250'].Create(ees.fcanvas.getCenter());
-		ees.fcanvas.add(t);
-//		t.setLeft(this.fab);
-//		t.setTop(comp.y);    
+	    //var t = ees.libraries['MPU-9250'].Create(ees.fcanvas.getCenter());
+	//	ees.fcanvas.add(t);
+		ees.resetView();
 	});
 	
 	this.container.append(this.bottomPanel);
@@ -205,10 +204,10 @@ EeSchema.prototype.parseSchematic = function(txt) {
 	//this.zoomOut();
 	//this.zoomOut();
 	
-	this.sizer.width(this.canvasScale * this.sheetWidth);
-	this.sizer.height(this.canvasScale * this.sheetHeight);
-	console.log('done parsing schematic');
-	//this.resetView();
+	//this.sizer.width(this.canvasScale * this.sheetWidth);
+	//this.sizer.height(this.canvasScale * this.sheetHeight);
+	
+	this.resetView();
 }
 
 EeSchema.prototype.parseComponent = function(lines) {
@@ -445,30 +444,7 @@ EeSchema.prototype.recalcScroll = function() {
 }
 	
 EeSchema.prototype.resetView = function() {
-	var objects = this.fcanvas.getObjects();
-    for (var i in objects) {
-        var scaleX = objects[i].scaleX;
-        var scaleY = objects[i].scaleY;
-        var left = objects[i].left;
-        var top = objects[i].top;
-    
-        var tempScaleX = (scaleX - this.canvasPan[0]) * (1 / this.canvasScale);
-        var tempScaleY = (scaleY - this.canvasPan[1]) * (1 / this.canvasScale);
-        var tempLeft = left * (1 / this.canvasScale);
-        var tempTop = top * (1 / this.canvasScale);
-
-        objects[i].scaleX = tempScaleX;
-        objects[i].scaleY = tempScaleY;
-        objects[i].left = tempLeft;
-        objects[i].top = tempTop;
-
-        objects[i].setCoords();
-    }
-    
-	this.panner.scrollLeft(0);
-	this.panner.scrollTop(0);
-	
-    this.fcanvas.renderAll();
-    
-    this.canvasScale = 1;
+	var center = this.fcanvas.getCenter();
+	this.fcanvas.panAbsoltue(center.left, center.top);
+	this.fcanvas.setZoom(1);
 }
