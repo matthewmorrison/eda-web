@@ -84,7 +84,10 @@ EeSchema.prototype._init = function() {
 			ees.fcanvas.relativePan(new fabric.Point(x, y));
 			resetElement();
 		})
-		.on("pinchstart pinchmove", onPinch);
+		.on("pinchstart pinchmove", onPinch)
+		.on("pinchend", function(e) {
+			ees.fcanvas.setZoom(e.scale);
+		});
 
 	var reqAnimationFrame = (function () {
 		return window[Hammer.prefixed(window, 'requestAnimationFrame')] || function (callback) {
