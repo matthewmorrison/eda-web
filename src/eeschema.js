@@ -9,8 +9,8 @@ function EeSchema(container) {
 	this.components = [];
 	this.wires = []; // and buses
 	this.junctions = [];
-    	this.dragStatus = 'none'
-    	this.canvas = $('<canvas />');
+    this.dragStatus = 'none'
+    this.canvas = $('<canvas />');
 	this.rightPanel = $('<div class="eeschema-panel-right" />');
 	this.testButton = $('<input type="button" value="Test" />');
 	this.bottomPanel = $('<div class="eeschema-panel-bottom" />');
@@ -91,9 +91,10 @@ EeSchema.prototype._init = function() {
 	var initScale = 1;
 	function onPinch(ev) {
 	    if(ev.type == 'pinchstart') {
+			$(el).removeClass('animate').css('position', 'absolute');
 	        initScale = transform.scale || 1;
 	    }
-
+		
 	    transform.scale = initScale * ev.scale;
 
 	    requestElementUpdate();
