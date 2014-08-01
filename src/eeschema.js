@@ -103,7 +103,7 @@ EeSchema.prototype._init = function() {
 	function updateElementTransform() {
 		var value = [
 			'translate3d(' + transform.translate.x + 'px, ' + transform.translate.y + 'px, 0)',
-			'scale(' + transform.scale + ', ' + transform.scale + ')',
+			'scale(' + .9 + ', ' + .9 + ')',
 			'rotate3d('+ transform.rx +','+ transform.ry +','+ transform.rz +','+  transform.angle + 'deg)'
 		];
 
