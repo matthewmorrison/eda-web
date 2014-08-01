@@ -1,32 +1,32 @@
 function EeSchema(container) {
     this.container = $(container);
-    this.canvas = $('<canvas />');	
 	this.canvasScale = 1;
 	this.SCALE_FACTOR = 1.2;
 	this.PAN_STEP = 1.1;
 	this.canvasPan = [0, 0];
-	this.panner = $('<div class="eeschema-canvas-panner" />');
-	this.zoomer = $('<div class="eeschema-canvas-zoomer"><canvas /></div>');
-	this.sizer = $('<div class="eeschema-canvas-sizer" />');
 	this.localMode = false;
 	this.libraries = {};
 	this.components = [];
 	this.wires = []; // and buses
 	this.junctions = [];
+    this.dragStatus = 'none'
+    this.canvas = $('<canvas />');
 	this.rightPanel = $('<div class="eeschema-panel-right" />');
 	this.testButton = $('<input type="button" value="Test" />');
 	this.bottomPanel = $('<div class="eeschema-panel-bottom" />');
+	this.sizer = $('<div class="eeschema-canvas-sizer" />');
+	this.canvasContainer = $('<div class="eeschema-canvas-container" />');
 	this.coords = $('<div class="eeschema-coords" >Coords</div>');
-	this.dragStatus = 'none';
+	this.panPreview = $('<div class="eeschema-pan-preview" >');
+
+	this.container.append(this.canvasContainer);
+	this.canvasContainer.append(this.panPreview);
+	//this.panner.append(this.sizer);
+	this.canvasContainer.append(this.canvas);
 	
 	var ees = this;
 	container = this.container;
-	
-	this.container.append(this.panner);
-	this.panner.append(this.sizer);
-	this.panner.append(this.zoomer);
-    this.zoomer.append(this.canvas);
-	
+
 	this.container.append(this.rightPanel);
 	this.rightPanel.append(this.testButton);
 	this.testButton.on('click', function() {
@@ -40,13 +40,32 @@ function EeSchema(container) {
 	
 	this.fcanvas = new fabric.Canvas(this.canvas.get(0));
 	
-	//this.fcanvas.allowTouchScrolling = true;
-
-	this.fcanvas.setWidth(this.zoomer.width() - 10);
-	this.fcanvas.setHeight(this.zoomer.height());
+	this.upperCanvas = this.container.find('.upper-canvas');
 	
-	this.zoomer.on('scroll', function(e) {
-		e.preventDefault();
+	this._init();
+	
+	this.fcanvas.selection = false;
+	this.fcanvas.allowTouchScrolling = false;
+
+    var sbWidth = getScrollbarWidth();
+
+	this.fcanvas.setWidth(this.canvasContainer.width());
+	this.fcanvas.setHeight(this.canvasContainer.height());
+}
+
+EeSchema.prototype._init = function() {
+	var ees = this;
+	
+	//this.container.find('.canvas-container').css('margin', '1000px 0');
+	
+    this.upperCanvas.on('mousewheel', function(e) {
+        if(e.deltaY > 0)
+            ees.zoomIn();
+        else if(e.deltaY < 0)
+            ees.zoomOut();
+        
+        
+		/*e.preventDefault();
 	    zoomer = $(this);
 		var scroll = zoomer.scrollTop();
 		
@@ -57,10 +76,10 @@ function EeSchema(container) {
 			ees.zoomOut();
 		}
 		
-		zoomer.scrollTop(1000);
+		zoomer.scrollTop(1000);*/
 	});
 	
-	this.panner.on('scroll', function(e) {
+/*	this.panner.on('scroll', function(e) {	
 		var panner = $(this);
 		
 		var left = panner.scrollLeft();
@@ -79,11 +98,11 @@ function EeSchema(container) {
 	    ees.fcanvas.absolutePan(new fabric.Point(left, top));
 	    
 	    ees.updatePan();
-	});
+	});*/
 
-	this.zoomer.scrollTop(1000);
+	//this.zoomer.scrollTop(1000);
 	
-	this.fcanvas.on('mouse:down', function(obj) {
+	/*this.fcanvas.on('mouse:down', function(obj) {
 		var dragHandle = function(obj) {
 			ees.canvasDrag(obj.e);
 		}
@@ -101,7 +120,7 @@ function EeSchema(container) {
 				ees.updatePan();
 			}
 		});
-	});
+	});*/
 	
 	this.fcanvas.on('mouse:move', function(obj) {
 		var e = obj.e;	
@@ -112,6 +131,52 @@ function EeSchema(container) {
 		
 		ees.coords.html((e.clientX/zoom - ees.fcanvas.viewportTransform[4]/zoom) + ', ' + (e.clientY/zoom - ees.fcanvas.viewportTransform[5]/zoom));
 	});
+	
+	
+    /*var canvasHammer = new Hammer(this.canvasContainer.get(0));
+    
+    canvasHammer.on('panstart', function(e) {
+        ees.coords.html('pan');
+    	ees.dragPanStart = [ees.fcanvas.viewportTransform[4], ees.fcanvas.viewportTransform[5]];
+        ees.dragStatus = 'start';
+        
+        
+        ees.container.addClass('panning');
+        ees.panPreview.css('top', 0);
+        ees.panPreview.css('left', 0);
+        ees.panPreview.css('opacity', .5);
+    })
+    .on('panmove', function(e) {
+        ees.panPreview.css('top', e.deltaY);
+        ees.panPreview.css('left', e.deltaX);
+    
+       // var x = -ees.dragPanStart[0] - e.deltaX;
+        //var y = -ees.dragPanStart[1] - e.deltaY;   
+        //ees.fcanvas.absolutePan(new fabric.Point(x, y));
+    })
+    .on('panend', function(e) {
+        ees.dragStatus = 'none';
+        
+        ees.panPreview.css('top', 0);
+        ees.panPreview.css('left', 0);
+        ees.container.removeClass('panning');
+        var x = -ees.dragPanStart[0] - e.deltaX;
+        var y = -ees.dragPanStart[1] - e.deltaY;   
+        ees.fcanvas.absolutePan(new fabric.Point(x, y));
+    })
+    .on('pinchstart', function() {
+        this.coords.html('zoom');
+        ees.zoomOut();
+    });*/
+}
+
+//var screen = document.querySelector(".device-screen");
+
+
+
+
+EeSchema.prototype._initMobile = function() {
+
 }
 
 EeSchema.prototype.canvasDrag = function(e) {
@@ -121,7 +186,7 @@ EeSchema.prototype.canvasDrag = function(e) {
 	var x = this.dragStart[0] - this.fcanvas.mouseX  - this.dragPanStart[0];
 	var y = this.dragStart[1] - this.fcanvas.mouseY - this.dragPanStart[1];
 		
-	this.fcanvas.absolutePan(new fabric.Point(x, y));
+	absolutePan(new fabric.Point(x, y));
 }
 
 function getScrollbarWidth() {
@@ -164,7 +229,7 @@ EeSchema.prototype.open = function(location) {
 EeSchema.prototype.parseSchematic = function(txt) {
 	var lines = txt.split('\n');
 	var section = '';
-			
+
 	for(var l_index = 0; l_index < lines.length; l_index++) {
 		var line = lines[l_index];
 		
@@ -193,6 +258,8 @@ EeSchema.prototype.parseSchematic = function(txt) {
 				l_index += this.parseComponent(lines.slice(l_index));
 			}
 			else if(props[0] == 'Wire' || props[0] == 'Entry') {
+                continue
+                    
 				var wire = {
 					type: props[0],
 					purpose: props[1],
@@ -225,6 +292,9 @@ EeSchema.prototype.parseSchematic = function(txt) {
 			}
 		}
 	}
+	
+	console.log('Done parsing schematic: ', new Date());
+
 	
 	this.resetView();
 }
@@ -268,6 +338,7 @@ EeSchema.prototype.parseComponent = function(lines) {
 	
 	if(comp.definition != null) {
 		comp.fabric = comp.definition.Create(center);
+		comp.fabric.selectable = false;
 		this.fcanvas.add(comp.fabric);
 		comp.fabric.setLeft(comp.x);
 		comp.fabric.setTop(comp.y);
@@ -326,6 +397,7 @@ EeSchema.prototype.zoomOut = function() {
 }
 
 EeSchema.prototype.updatePan = function(allowOverPan) {
+return;
 	var zoom = this.fcanvas.getZoom();
 	var zoomW = zoom * this.sheetWidth;
     var zoomH = zoom * this.sheetHeight;
@@ -344,8 +416,8 @@ EeSchema.prototype.updatePan = function(allowOverPan) {
 	this.panner.scrollLeft(-1 * this.fcanvas.viewportTransform[4]);
 	this.panner.scrollTop(-1 * this.fcanvas.viewportTransform[5]);
 	
-	this.zoomer.css('left', this.panner.scrollLeft());
-	this.zoomer.css('top', this.panner.scrollTop());
+	//this.zoomer.css('left', this.panner.scrollLeft());
+	//this.zoomer.css('top', this.panner.scrollTop());
 }
 
 EeSchema.prototype.recalcScroll = function() {
