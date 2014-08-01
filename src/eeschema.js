@@ -90,6 +90,7 @@ EeSchema.prototype._init = function() {
 	
 	var initScale = 1;
 	function onPinch(ev) {
+		$(el).css('display', 'none');
 	    if(ev.type == 'pinchstart') {
 			$(el).removeClass('animate').css('position', 'absolute');
 	        initScale = transform.scale || 1;
@@ -103,7 +104,7 @@ EeSchema.prototype._init = function() {
 	function updateElementTransform() {
 		var value = [
 			'translate3d(' + transform.translate.x + 'px, ' + transform.translate.y + 'px, 0)',
-			'scale(' + .9 + ', ' + .9 + ')',
+			'scale(' + transform.scale + ', ' + transform.scale + ')',
 			'rotate3d('+ transform.rx +','+ transform.ry +','+ transform.rz +','+  transform.angle + 'deg)'
 		];
 
