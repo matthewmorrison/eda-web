@@ -56,7 +56,96 @@ function EeSchema(container) {
 EeSchema.prototype._init = function() {
 	var ees = this;
 	
-	//this.container.find('.canvas-container').css('margin', '1000px 0');
+	var START_X = 0;
+	var START_Y = 0;
+	var ticking = false;
+	var transform;
+	var timer;	
+	var el = document.querySelector(".canvas-container");
+	
+	mc = new Hammer.Manager(el);
+	mc.add(new Hammer.Pan({ threshold: 0, pointers: 0 }));
+	mc
+		.on("panstart", function(e) {
+			// Draw whole preview here
+			onPan(e);
+		})
+		.on("panmove", function(e) {
+			onPan(e);
+		})
+		.on("panend", function(e) {
+			var x = e.deltaX;
+			var y = e.deltaY;   
+			console.log(e.deltaX, e.deltaY);
+			ees.fcanvas.relativePan(new fabric.Point(x, y));
+			resetElement();
+		})
+		.on("pinchstart pinchmove", onPinch);
+
+	var reqAnimationFrame = (function () {
+		return window[Hammer.prefixed(window, 'requestAnimationFrame')] || function (callback) {
+			window.setTimeout(callback, 1000 / 60);
+		};
+	})();
+	
+	var initScale = 1;
+	function onPinch(ev) {
+	    if(ev.type == 'pinchstart') {
+	        initScale = transform.scale || 1;
+	    }
+
+	    el.className = '';
+	    transform.scale = initScale * ev.scale;
+
+	    logEvent(ev);
+	    requestElementUpdate();
+	}
+	
+	function updateElementTransform() {
+		var value = [
+			'translate3d(' + transform.translate.x + 'px, ' + transform.translate.y + 'px, 0)',
+			'scale(' + transform.scale + ', ' + transform.scale + ')',
+			'rotate3d('+ transform.rx +','+ transform.ry +','+ transform.rz +','+  transform.angle + 'deg)'
+		];
+
+		value = value.join(" ");
+		el.style.webkitTransform = value;
+		el.style.mozTransform = value;
+		el.style.transform = value;
+		ticking = false;
+	}
+
+	function onPan(ev) {
+			$(el).removeClass('animate').css('position', 'absolute');
+			transform.translate = {
+				x: START_X + ev.deltaX,
+				y: START_Y + ev.deltaY
+			};
+
+			requestElementUpdate();
+	}
+
+	function requestElementUpdate() {
+		if(!ticking) {
+			reqAnimationFrame(updateElementTransform);
+			ticking = true;
+		}
+	}
+
+	function resetElement() {
+			$(el).addClass('animate');
+			transform = {
+				translate: { x: START_X, y: START_Y },
+				scale: 1,
+				angle: 0,
+				rx: 0,
+				ry: 0,
+				rz: 0
+			};
+			requestElementUpdate();
+	}
+	
+	resetElement();
 	
     this.upperCanvas.on('mousewheel', function(e) {
         if(e.deltaY > 0)
