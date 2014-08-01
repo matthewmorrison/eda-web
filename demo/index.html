@@ -45,7 +45,7 @@
             if(window.location.host.indexOf('192') == 0 || window.location.host == 'localhost' || window.location.protocol == 'file:') {
                 loadjscssfile('eeschema-component.js?t=' + new Date().getTime(), 'js', function() { loadedJs('eeschema-component') });
                 loadjscssfile('eeschema.js?t=' + new Date().getTime(), 'js', function() { loadedJs('eeschema') });
-                loadjscssfile('../libs/jquery.mousewheel.min.js', 'js', function() { loadedJs('eeschema') });
+                //loadjscssfile('../libs/jquery.mousewheel.min.js', 'js', function() { loadedJs('eeschema') });
                 
                 //if('ontouchstart' in window)
                     loadjscssfile('../libs/hammer.min.js', 'js', function() { loadedJs('hammer') });   
@@ -53,10 +53,10 @@
             else {
                 loadjscssfile('//rawgit.com/matthewmorrison/eda-web/master/src/eeschema-component.js', 'js', function() { loadedJs('eeschema-component') });
                 loadjscssfile('//rawgit.com/matthewmorrison/eda-web/master/src/eeschema.js?t', 'js', function() { loadedJs('eeschema') });
-                loadjscssfile('../libs/jquery.mousewheel.min.js', 'js', function() { loadedJs('eeschema') });
+                //loadjscssfile('//rawgit.com/matthewmorrison/eda-web/master/libs/jquery.mousewheel.min.js', 'js', function() { loadedJs('eeschema') });
                 
                 //if('ontouchstart' in window)
-                    loadjscssfile('../libs/hammer.min.js', 'js', function() { loadedJs('eeschema') });   
+                    loadjscssfile('//rawgit.com/matthewmorrison/eda-web/master/libs/hammer.min.js', 'js', function() { loadedJs('eeschema') });   
             }
         });
     </script>
