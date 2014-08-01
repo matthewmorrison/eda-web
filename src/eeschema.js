@@ -65,6 +65,10 @@ EeSchema.prototype._init = function() {
 	
 	mc = new Hammer.Manager(el);
 	mc.add(new Hammer.Pan({ threshold: 0, pointers: 0 }));
+	
+	mc.add(new Hammer.Pan({ threshold: 0, pointers: 0 }));
+	mc.add(new Hammer.Pinch({ threshold: 0 })).recognizeWith([mc.get('pan')]);
+	
 	mc
 		.on("panstart", function(e) {
 			// Draw whole preview here
