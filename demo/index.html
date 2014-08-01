@@ -32,20 +32,31 @@
             else if(file == 'eeschema-component') {
                 window.loadedEESC = true;
             }
+            else if(file == 'hammer') {
+                window.loadedHammer = true;
+            }
             
-            if(window.loadedEES && window.loadedEESC) {
+            if(window.loadedEES && window.loadedEESC && window.loadedHammer) {
                 loadTest();
             }
         }
         
         $(function() {
-            if(window.location.host == 'localhost' || window.location.protocol == 'file:') {
-                loadjscssfile('eeschema-component.js', 'js', function() { loadedJs('eeschema-component') });
-                loadjscssfile('eeschema.js', 'js', function() { loadedJs('eeschema') });   
+            if(window.location.host.indexOf('192') == 0 || window.location.host == 'localhost' || window.location.protocol == 'file:') {
+                loadjscssfile('eeschema-component.js?t=' + new Date().getTime(), 'js', function() { loadedJs('eeschema-component') });
+                loadjscssfile('eeschema.js?t=' + new Date().getTime(), 'js', function() { loadedJs('eeschema') });
+                loadjscssfile('../libs/jquery.mousewheel.min.js', 'js', function() { loadedJs('eeschema') });
+                
+                //if('ontouchstart' in window)
+                    loadjscssfile('../libs/hammer.min.js', 'js', function() { loadedJs('hammer') });   
             }
             else {
                 loadjscssfile('//rawgit.com/matthewmorrison/eda-web/master/src/eeschema-component.js', 'js', function() { loadedJs('eeschema-component') });
-                loadjscssfile('//rawgit.com/matthewmorrison/eda-web/master/src/eeschema.js', 'js', function() { loadedJs('eeschema') });
+                loadjscssfile('//rawgit.com/matthewmorrison/eda-web/master/src/eeschema.js?t', 'js', function() { loadedJs('eeschema') });
+                loadjscssfile('../libs/jquery.mousewheel.min.js', 'js', function() { loadedJs('eeschema') });
+                
+                //if('ontouchstart' in window)
+                    loadjscssfile('../libs/hammer.min.js', 'js', function() { loadedJs('eeschema') });   
             }
         });
     </script>
@@ -59,16 +70,21 @@
 			bottom: 0;
 			overflow: hidden;
 			z-index: 50;
+			background-color: #fff;
         }
         
-        .eeschema-canvas-panner {
-            overflow: scroll;
+        .eeschema-canvas-container {
             position: absolute;
 			top: 0;
             left: 0;
 			bottom: 20px;
 			right: 80px;
-			background-color: #999;
+			background-color: #fff;
+        }
+        
+        .eeschema.panning .eeschema-canvas-container,
+        .eeschema.panning {
+            background-color: #ffc;
         }
         
         .eeschema-coords {
@@ -77,20 +93,8 @@
         
         .eeschema canvas {
             position: absolute;
-            margin: 1000px 0;
+/*            margin: 1000px 0;*/
             height: 100%;
-        }
-        
-        .eeschema-canvas-zoomer {
-            position: absolute;
-            left: 0;
-            top: 0;
-			width: 100%;
-			/*padding-right: 20px;*/
-			height: 100%;
-            overflow-y: scroll;
-            overflow-x: hidden;
-            background-color: #fff;
         }
         
         .eeschema-panel-right {
@@ -100,7 +104,6 @@
 			bottom: 20px;
             background-color: red;
 			right: 0;
-            
         }
 		
 		.eeschema-panel-bottom {
@@ -110,6 +113,15 @@
 			height: 20px;
 			background-color: green;
 		}
+		
+		.eeschema-pan-preview {
+		    position: absolute;
+		    width: 100%;
+		    height: 100%;
+		    top: 0;
+		    left: 0;
+		    background-color: #00f;
+        }
 	</style>
 </head>
 <body>	
@@ -126,7 +138,7 @@
 			throw 'Expected a maximum of ' + max + ' properties, but found ' + count;
 	}
 	
-	
+
 	
 	function loadTest() {
 		var testComp = 'DEF BEAD ?? 0 40 Y Y 1 L N\r\n' +
@@ -196,6 +208,81 @@
 //		else {
 //			ees.open('https://rawgit.com/matthewmorrison/stereo-camera-board/master/kicad/stereo-camera-board.sch');
 //		}
+
+el = document.querySelector(".canvas-container");
+
+
+mc = new Hammer.Manager(el);
+
+mc.add(new Hammer.Pan({ threshold: 0, pointers: 0 }));
+
+mc.on("panstart panmove", onPan);
+
+var START_X = 0;
+var START_Y = 0;
+
+var ticking = false;
+var transform;
+var timer;	
+
+var mc;
+var el;
+
+var reqAnimationFrame = (function () {
+    return window[Hammer.prefixed(window, 'requestAnimationFrame')] || function (callback) {
+        window.setTimeout(callback, 1000 / 60);
+    };
+})();
+
+function updateElementTransform() {
+    var value = [
+        'translate3d(' + transform.translate.x + 'px, ' + transform.translate.y + 'px, 0)',
+        'scale(' + transform.scale + ', ' + transform.scale + ')',
+        'rotate3d('+ transform.rx +','+ transform.ry +','+ transform.rz +','+  transform.angle + 'deg)'
+    ];
+
+    value = value.join(" ");
+    el.style.webkitTransform = value;
+    el.style.mozTransform = value;
+    el.style.transform = value;
+    ticking = false;
+}
+
+
+
+function onPan(ev) {
+	    $(el).removeClass('animate').css('position', 'absolute');
+	    transform.translate = {
+	        x: START_X + ev.deltaX,
+	        y: START_Y + ev.deltaY
+	    };
+
+	    requestElementUpdate();
+}
+
+function requestElementUpdate() {
+    if(!ticking) {
+        reqAnimationFrame(updateElementTransform);
+        ticking = true;
+    }
+}
+
+function resetElement() {
+	    $(el).addClass('animate');
+	    transform = {
+	        translate: { x: START_X, y: START_Y },
+	        scale: 1,
+	        angle: 0,
+	        rx: 0,
+	        ry: 0,
+	        rz: 0
+	    };
+	    requestElementUpdate();
+}
+
+resetElement();
+
+//reqAnimationFrame();
 	}
 	</script>
 	
