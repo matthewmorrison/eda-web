@@ -94,7 +94,6 @@ EeSchema.prototype._init = function() {
 	
 	var initScale = 1;
 	function onPinch(ev) {
-		$(el).css('display', 'none');
 	    if(ev.type == 'pinchstart') {
 			$(el).removeClass('animate').css('position', 'absolute');
 	        initScale = transform.scale || 1;
