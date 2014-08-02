@@ -59,17 +59,34 @@ EeSchema.prototype._init = function() {
 	var START_X = 0;
 	var START_Y = 0;
 	var ticking = false;
-	var transform;
+	var isPinching = false;
+	var isPanning = false;
+	var transform = {
+				translate: { x: START_X, y: START_Y },
+				scale: 1,
+				angle: 0,
+				rx: 0,
+				ry: 0,
+				rz: 0
+	};
+	
 	var timer;	
 	var el = document.querySelector(".canvas-container");
 	
 	mc = new Hammer.Manager(el);
 	mc.add(new Hammer.Pan({ threshold: 0, pointers: 0 }));
-	
-	mc.add(new Hammer.Pan({ threshold: 0, pointers: 0 }));
+	//mc.add(new Hammer.Pinch({ threshold: 0 }))
 	mc.add(new Hammer.Pinch({ threshold: 0 })).recognizeWith([mc.get('pan')]);
 	
 	mc
+	    .on("pinchstart pinchmove pinchend panstart panmove panend", onGesture);
+		/*.on("pinchstart pinchmove", onPinch)
+		.on("pinchend", function(e) {
+			var center = ees.fcanvas.getCenter();
+			ees.fcanvas.zoomToPoint(new fabric.Point(center.left, center.top), ev.scale * ees.fcanvas.getZoom());
+			
+		    gestureEnd(e);
+		})
 		.on("panstart", function(e) {
 			// Draw whole preview here
 			onPan(e);
@@ -78,16 +95,8 @@ EeSchema.prototype._init = function() {
 			onPan(e);
 		})
 		.on("panend", function(e) {
-			var x = e.deltaX;
-			var y = e.deltaY;   
-			console.log(e.deltaX, e.deltaY);
-			ees.fcanvas.relativePan(new fabric.Point(x, y));
-			resetElement();
-		})
-		.on("pinchstart pinchmove", onPinch)
-		.on("pinchend", function(e) {
-			ees.fcanvas.setZoom(e.scale);
-		});
+		
+		});*/
 
 	var reqAnimationFrame = (function () {
 		return window[Hammer.prefixed(window, 'requestAnimationFrame')] || function (callback) {
@@ -96,15 +105,56 @@ EeSchema.prototype._init = function() {
 	})();
 	
 	var initScale = 1;
-	function onPinch(ev) {
-	    if(ev.type == 'pinchstart') {
-			$(el).removeClass('animate').css('position', 'absolute');
-	        initScale = transform.scale || 1;
+	
+	function onGesture(ev) {
+	try {
+        if(ev.type == 'panmove') {
+			transform.translate = {
+				x: START_X + ev.deltaX,
+				y: START_Y + ev.deltaY
+			};
+			
+			requestElementUpdate();
+        }
+        else if(ev.type == 'pinchmove') {
+	        transform.scale = initScale * ev.scale;
+			requestElementUpdate();
 	    }
-		
-	    transform.scale = initScale * ev.scale;
+        else if(ev.type == 'panstart') {
+            isPanning = true;
+        }
+	    else if(ev.type == 'pinchstart') {
+   		    isPinching = true;
+	        //initScale = 1; //ees.fcanvas.getZoom();
+	    }
+		else if(ev.type == 'pinchend') {
+		    transform.scale = initScale * ev.scale;
+		    requestElementUpdate();
+		    
+		    if(!ev.isFinal) {
+		        initScale = transform.scale;
+		    }
+	    }
+        else if(ev.isFinal) {
+            var center = ees.fcanvas.getCenter();
+			ees.fcanvas.zoomToPoint(new fabric.Point(center.left, center.top), transform.scale * ees.fcanvas.getZoom());
+			
+			onPanEnd(ev);
+			
+			resetElement();
+			requestElementUpdate();
+        }    
+        }catch(e) {
+            this.coords.html('Error: ' + e);
+        }   
+	}
+	
+	function onPanEnd(ev) {			
+			var x = ev.deltaX;
+			var y = ev.deltaY;   
 
-	    requestElementUpdate();
+			ees.fcanvas.relativePan(new fabric.Point(x, y));
+		    //resetElement();
 	}
 	
 	function updateElementTransform() {
@@ -121,16 +171,6 @@ EeSchema.prototype._init = function() {
 		ticking = false;
 	}
 
-	function onPan(ev) {
-			$(el).removeClass('animate').css('position', 'absolute');
-			transform.translate = {
-				x: START_X + ev.deltaX,
-				y: START_Y + ev.deltaY
-			};
-
-			requestElementUpdate();
-	}
-
 	function requestElementUpdate() {
 		if(!ticking) {
 			reqAnimationFrame(updateElementTransform);
@@ -140,14 +180,14 @@ EeSchema.prototype._init = function() {
 
 	function resetElement() {
 			$(el).addClass('animate');
-			transform = {
-				translate: { x: START_X, y: START_Y },
-				scale: 1,
-				angle: 0,
-				rx: 0,
-				ry: 0,
-				rz: 0
-			};
+			transform.translate = { x: START_X, y: START_Y };
+			transform.scale = 1;
+			transform.angle = 0;
+			transform.rx = 0;
+			transform.ry = 0;
+			transform.rz = 0;
+			initScale = 1;
+
 			requestElementUpdate();
 	}
 	
@@ -224,7 +264,7 @@ EeSchema.prototype._init = function() {
 		ees.fcanvas.mouseY = e.clientY;
 		var zoom = ees.fcanvas.getZoom();
 		
-		ees.coords.html((e.clientX/zoom - ees.fcanvas.viewportTransform[4]/zoom) + ', ' + (e.clientY/zoom - ees.fcanvas.viewportTransform[5]/zoom));
+		//ees.coords.html((e.clientX/zoom - ees.fcanvas.viewportTransform[4]/zoom) + ', ' + (e.clientY/zoom - ees.fcanvas.viewportTransform[5]/zoom));
 	});
 	
 	
