@@ -73,7 +73,7 @@ EeSchema.prototype._init = function() {
 	var timer;	
 	var el = document.querySelector(".canvas-container");
 	
-	mc = new Hammer.Manager(el);
+	mc = new Hammer.Manager(el);//document.querySelector(".eeschema-canvas-container"));
 	mc.add(new Hammer.Pan({ threshold: 0, pointers: 0 }));
 	//mc.add(new Hammer.Pinch({ threshold: 0 }))
 	mc.add(new Hammer.Pinch({ threshold: 0 })).recognizeWith([mc.get('pan')]);
@@ -107,44 +107,53 @@ EeSchema.prototype._init = function() {
 	var initScale = 1;
 	
 	function onGesture(ev) {
-	try {
-        if(ev.type == 'panmove') {
-			transform.translate = {
-				x: START_X + ev.deltaX,
-				y: START_Y + ev.deltaY
-			};
+	    try {
+	    console.log(ev);
+            if(ev.type == 'panmove') {
+			    transform.translate = {
+				    x: START_X + ev.deltaX,
+				    y: START_Y + ev.deltaY
+			    };
 			
-			requestElementUpdate();
+			    requestElementUpdate();
+            }
+            else if(ev.type == 'pinchmove') {
+	            transform.scale = initScale * ev.scale;
+			    requestElementUpdate();
+	        }
+            else if(ev.type == 'panstart') {
+                isPanning = true;
+            }
+	        else if(ev.type == 'pinchstart') {
+       		    isPinching = true;
+	            //initScale = 1; //ees.fcanvas.getZoom();
+	        }
+            else if(ev.isFinal || (!isPanning && ev.type == 'pinchend')) { // hammerjs has a bug that prevents isFinal from getting set when pinchend
+		        ees.coords.html('isFinal');
+                var center = ees.fcanvas.getCenter();
+			    ees.fcanvas.zoomToPoint(new fabric.Point(center.left, center.top), transform.scale * ees.fcanvas.getZoom());
+			
+			    onPanEnd(ev);
+			
+			    resetElement();
+			    requestElementUpdate();
+            } 
+		    else if(ev.type == 'pinchend') {
+		        //ees.coords.html('pinchend');
+		        isPinching = false;
+		        transform.scale = initScale * ev.scale;
+		        requestElementUpdate();
+		        
+		        if(!ev.isFinal) {
+		            initScale = transform.scale;
+		        }
+	        }   
+	        else if(ev.type == 'panend') {
+		        ees.coords.html('panend');
+		        isPanning = false;
+	        }
         }
-        else if(ev.type == 'pinchmove') {
-	        transform.scale = initScale * ev.scale;
-			requestElementUpdate();
-	    }
-        else if(ev.type == 'panstart') {
-            isPanning = true;
-        }
-	    else if(ev.type == 'pinchstart') {
-   		    isPinching = true;
-	        //initScale = 1; //ees.fcanvas.getZoom();
-	    }
-		else if(ev.type == 'pinchend') {
-		    transform.scale = initScale * ev.scale;
-		    requestElementUpdate();
-		    
-		    if(!ev.isFinal) {
-		        initScale = transform.scale;
-		    }
-	    }
-        else if(ev.isFinal) {
-            var center = ees.fcanvas.getCenter();
-			ees.fcanvas.zoomToPoint(new fabric.Point(center.left, center.top), transform.scale * ees.fcanvas.getZoom());
-			
-			onPanEnd(ev);
-			
-			resetElement();
-			requestElementUpdate();
-        }    
-        }catch(e) {
+        catch(e) {
             this.coords.html('Error: ' + e);
         }   
 	}
