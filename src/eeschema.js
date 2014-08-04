@@ -93,11 +93,11 @@ EeSchema.prototype._init = function() {
 	
 	var initScale = 1;
 	var startDraw = new Date().getTime();
-	var redraw = false;
+	var doRedraw = false;
 	   
 	function onGesture(ev) {
 	    try {
-			redraw = new Date() - startDraw > 1000;
+			doRedraw = new Date() - startDraw > 1000;
 
 			ees.scale.html(ev.scale);
 			ees.deltas.html(ev.deltaX + ', ' + ev.deltaY);
@@ -148,7 +148,7 @@ EeSchema.prototype._init = function() {
             //} 
 		    else if(ev.type == 'pinchend') {
 				isPinching = false;
-				redraw = true;
+				doRedraw = true;
 		        //ees.coords.html('pinchend');
 		        /*isPinching = false;
 		        transform.scale = initScale * ev.scale;
@@ -161,15 +161,24 @@ EeSchema.prototype._init = function() {
 	        else if(ev.type == 'panend') {
 		        //ees.coords.html('panend');
 		        isPanning = false;
-				redraw = true;
+				doRedraw = true;
 	        }
+
+			transform.translate = {
+				    x: START_X + ev.deltaX,
+				    y: START_Y + ev.deltaY
+			};
 			
-			if(redraw) {
+			transform.scale = initScale * ev.scale;
+			
+			if(doRedraw) {
 				var center = ees.fcanvas.getCenter();
 				console.log('redraw');
 				startDraw = new Date().getTime();
+				
 			    ees.fcanvas.zoomToPoint(new fabric.Point(center.left, center.top), transform.scale * ees.fcanvas.getZoom()); 
 				ees.fcanvas.relativePan(new fabric.Point(START_X + ev.deltaX, START_Y + ev.deltaY));
+				
 				var rt = new Date().getTime() - startDraw;
 				console.log(rt);
 				
