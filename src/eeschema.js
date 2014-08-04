@@ -18,7 +18,9 @@ function EeSchema(container) {
 	this.canvasContainer = $('<div class="eeschema-canvas-container" />');
 	this.coords = $('<div class="eeschema-coords" >Coords</div>');
 	this.canvasTouch = $('<div class="eeschema-canvas-touch" >');
-	this.target = $('<div class="debug" >1</div>');
+	this.target = $('<div class="debug" >2</div>');
+	this.scale = $('<div class="scale" >1</div>');
+	this.deltas = $('<div class="coords" >0, 0</div>');
 
 	this.container.append(this.canvasContainer);
 	//this.panner.append(this.sizer);
@@ -34,6 +36,8 @@ function EeSchema(container) {
 	});
 	
 	this.rightPanel.append(this.target);
+	this.rightPanel.append(this.scale);
+	this.rightPanel.append(this.deltas);
 	
 	this.container.append(this.bottomPanel);
 	this.bottomPanel.append(this.coords);
@@ -89,6 +93,8 @@ EeSchema.prototype._init = function() {
 	   
 	function onGesture(ev) {
 	    try {
+			this.scale = ev.scale;
+			this.deltas.html(ev.deltaX + ', ' + ev.deltaY);
 	        if(ev.type == 'pinchstart'
 	        || ev.type == 'pinchend'
 	        || ev.type == 'panstart'
