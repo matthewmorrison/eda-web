@@ -1,598 +1,3346 @@
-function EeSchema(container) {
-    this.container = $(container);
-	this.canvasScale = 1;
-	this.SCALE_FACTOR = 1.2;
-	this.PAN_STEP = 1.1;
-	this.canvasPan = [0, 0];
-	this.localMode = false;
-	this.libraries = {};
-	this.components = [];
-	this.wires = []; // and buses
-	this.junctions = [];
-    this.dragStatus = 'none'
-    this.canvas = $('<canvas />');
-	this.rightPanel = $('<div class="eeschema-panel-right" />');
-	this.testButton = $('<input type="button" value="Test" />');
-	this.bottomPanel = $('<div class="eeschema-panel-bottom" />');
-	this.sizer = $('<div class="eeschema-canvas-sizer" />');
-	this.canvasContainer = $('<div class="eeschema-canvas-container" />');
-	this.coords = $('<div class="eeschema-coords" >Coords</div>');
-	this.canvasTouch = $('<div class="eeschema-canvas-touch" >');
-	this.target = $('<div class="debug" >4</div>');
-	this.scale = $('<div class="scale" >1</div>');
-	this.deltas = $('<div class="coords" >0, 0</div>');
+<!DOCTYPE html>
+<html>
+<head>
+	<meta name="viewport" content="user-scalable=no, width=device-width, initial-scale=1, maximum-scale=1">
+	<script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/2.1.1/jquery.min.js" ></script> 
+	<script src="https://cdnjs.cloudflare.com/ajax/libs/fabric.js/1.4.8/fabric.min.js" ></script>
 
-	this.container.append(this.canvasContainer);
-	//this.panner.append(this.sizer);
-	this.canvasContainer.append(this.canvas);
-	
-	var ees = this;
-	container = this.container;
-
-	this.container.append(this.rightPanel);
-	this.rightPanel.append(this.testButton);
-	this.testButton.on('click', function() {
-		ees.resetView();
-	});
-	
-	this.rightPanel.append(this.target);
-	this.rightPanel.append(this.scale);
-	this.rightPanel.append(this.deltas);
-	
-	this.container.append(this.bottomPanel);
-	this.bottomPanel.append(this.coords);
-	this.fcanvas = new fabric.Canvas(this.canvas.get(0));
-	this.canvasContainer.append(this.canvasTouch);
-
-	this._init();
-
-	this.fcanvas.selection = false;
-	this.fcanvas.allowTouchScrolling = false;
-
-    var sbWidth = getScrollbarWidth();
-
-	this.fcanvas.setWidth(this.canvasContainer.width());
-	this.fcanvas.setHeight(this.canvasContainer.height());
-}
-
-EeSchema.prototype._init = function() {
-	var ees = this;
-	
-	var START_X = 0;
-	var START_Y = 0;
-	var ticking = false;
-	var isPinching = false;
-	var isPanning = false;
-	var transform = {
-				translate: { x: START_X, y: START_Y },
-				scale: 1,
-				angle: 0,
-				rx: 0,
-				ry: 0,
-				rz: 0
-	};
-	
-	var timer;	
-	var el = document.querySelector(".canvas-container");
-	
-	mc = new Hammer.Manager(document.querySelector(".eeschema-canvas-touch"));
-	mc.add(new Hammer.Pan({ threshold: 0, pointers: 0 }));
-	//mc.add(new Hammer.Pinch({ threshold: 0 }))
-	mc.add(new Hammer.Pinch({ threshold: 0 })).recognizeWith([mc.get('pan')]);
-	
-	mc
-	    .on("pinchstart pinchmove pinchend panstart panmove panend pinchcancel pancancel", onGesture);
-
-	var reqAnimationFrame = (function () {
-		return window[Hammer.prefixed(window, 'requestAnimationFrame')] || function (callback) {
-			window.setTimeout(callback, 1000 / 60);
-		};
-	})();
-	
-	var initScale = 1;
-	   
-	function onGesture(ev) {
-	    try {
-			ees.scale.html(ev.scale);
-			ees.deltas.html(ev.deltaX + ', ' + ev.deltaY);
-	        if(ev.type == 'pinchstart'
-	        || ev.type == 'pinchend'
-	        || ev.type == 'panstart'
-	        || ev.type == 'panend'
-			|| ev.type == 'pinchcancel'
-			|| ev.type == 'pancancel') {
-	            var l = '';
-	            if(ev.isFirst)
-	            	l += '[isFirst]';
-	            
-	            if(ev.isFinal)
-	            	l += '[isFinal]';
-	            
-	            ees.target.html(ev.target.className);
-	            
-	            ees.coords.html(ees.coords.html() + '->' + ev.type + l);
-	        }
-	        
-            if(ev.type == 'panmove') {
-			    transform.translate = {
-				    x: START_X + ev.deltaX,
-				    y: START_Y + ev.deltaY
-			    };
-			
-			    requestElementUpdate();
-            }
-            else if(ev.type == 'pinchmove') {
-	            transform.scale = initScale * ev.scale;
-			    requestElementUpdate();
-	        }
-            else if(ev.type == 'panstart') {
-                isPanning = true;
-            }
-	        else if(ev.type == 'pinchstart') {
-       		    isPinching = true;
-	            //initScale = 1; //ees.fcanvas.getZoom();
-	        }
-            else if(ev.isFinal || (ev.type == 'pinchend' && !isPanning)) { // hammerjs has a bug that prevents isFinal from getting set when pinchend
-		        //ees.coords.html('isFinal');
-                var center = ees.fcanvas.getCenter();
-			    ees.fcanvas.zoomToPoint(new fabric.Point(center.left, center.top), transform.scale * ees.fcanvas.getZoom());
-			
-			    onPanEnd(ev);
-			
-			    resetElement();
-			    requestElementUpdate();
-            } 
-		    else if(ev.type == 'pinchend') {
-		        //ees.coords.html('pinchend');
-		        isPinching = false;
-		        transform.scale = initScale * ev.scale;
-		        requestElementUpdate();
-		        
-		        if(!ev.isFinal || isPanning) {
-		            initScale = transform.scale;
-		        }
-	        }   
-	        else if(ev.type == 'panend') {
-		        //ees.coords.html('panend');
-		        isPanning = false;
-	        }
+    <script>
+        function loadjscssfile(filename, filetype, onload){
+             if (filetype=="js"){ //if filename is a external JavaScript file
+              var fileref=document.createElement('script')
+              fileref.setAttribute("type","text/javascript")
+              fileref.setAttribute("src", filename)
+             }
+             else if (filetype=="css"){ //if filename is an external CSS file
+              var fileref=document.createElement("link")
+              fileref.setAttribute("rel", "stylesheet")
+              fileref.setAttribute("type", "text/css")
+              fileref.setAttribute("href", filename)
+             }
+             if (typeof fileref!="undefined") {
+              if(typeof onload == 'function') {
+                fileref.onload = onload;
+              }
+              document.getElementsByTagName("head")[0].appendChild(fileref)
+             }
         }
-        catch(e) {
-            ees.coords.html('Error: ' + e);
-        }   
-	}
-	
-	function onPanEnd(ev) {			
-			var x = ev.deltaX;
-			var y = ev.deltaY;   
-
-			ees.fcanvas.relativePan(new fabric.Point(x, y));
-		    //resetElement();
-	}
-	
-	function updateElementTransform() {
-		var value = [
-			'translate3d(' + transform.translate.x + 'px, ' + transform.translate.y + 'px, 0)',
-			'scale(' + transform.scale + ', ' + transform.scale + ')',
-			'rotate3d('+ transform.rx +','+ transform.ry +','+ transform.rz +','+  transform.angle + 'deg)'
-		];
-
-		value = value.join(" ");
-		el.style.webkitTransform = value;
-		el.style.mozTransform = value;
-		el.style.transform = value;
-		ticking = false;
-	}
-
-	function requestElementUpdate() {
-		if(!ticking) {
-			reqAnimationFrame(updateElementTransform);
-			ticking = true;
-		}
-	}
-
-	function resetElement() {
-			$(el).addClass('animate');
-			transform.translate = { x: START_X, y: START_Y };
-			transform.scale = 1;
-			transform.angle = 0;
-			transform.rx = 0;
-			transform.ry = 0;
-			transform.rz = 0;
-			initScale = 1;
-
-			requestElementUpdate();
-	}
-	
-	resetElement();
-	
-    this.canvasTouch.on('mousewheel', function(e) {
-        if(e.deltaY > 0)
-            ees.zoomIn();
-        else if(e.deltaY < 0)
-            ees.zoomOut();
+    
+        function loadedJs(file) {
+            if(file == 'eeschema') {
+                window.loadedEES = true;
+            }
+            else if(file == 'eeschema-component') {
+                window.loadedEESC = true;
+            }
+            else if(file == 'hammer') {
+                window.loadedHammer = true;
+            }
+            
+            if(window.loadedEES && window.loadedEESC && window.loadedHammer) {
+                loadTest();
+            }
+        }
         
+        $(function() {
+			if( /Android|webOS|iPhone|iPad|iPod|BlackBerry/i.test(navigator.userAgent) ) {
+			  var ww = ( $(window).width() < window.screen.width ) ? $(window).width() : window.screen.width; //get proper width
+			  var mw = 480; // min width of site
+			  var ratio =  ww / mw; //calculate ratio
+			  if( ww < mw){ //smaller than minimum size
+			   $('#Viewport').attr('content', 'initial-scale=' + ratio + ', maximum-scale=' + ratio + ', minimum-scale=' + ratio + ', user-scalable=yes, width=' + ww);
+			  }else{ //regular size
+			   $('#Viewport').attr('content', 'initial-scale=1.0, maximum-scale=2, minimum-scale=1.0, user-scalable=yes, width=' + ww);
+			  }
+			}
+		
+            if(window.location.host.indexOf('192') == 0 || window.location.host == 'localhost' || window.location.protocol == 'file:') {
+                loadjscssfile('eeschema-component.js?t=' + new Date().getTime(), 'js', function() { loadedJs('eeschema-component') });
+                loadjscssfile('eeschema.js?t=' + new Date().getTime(), 'js', function() { loadedJs('eeschema') });
+                loadjscssfile('../libs/jquery.mousewheel.min.js', 'js', function() { loadedJs('eeschema') });
+                
+                //if('ontouchstart' in window)
+                    loadjscssfile('../libs/hammer.js', 'js', function() { loadedJs('hammer') });   
+            }
+            else {
+                loadjscssfile('//rawgit.com/matthewmorrison/eda-web/master/src/eeschema-component.js', 'js', function() { loadedJs('eeschema-component') });
+                loadjscssfile('//rawgit.com/matthewmorrison/eda-web/master/src/eeschema.js?t', 'js', function() { loadedJs('eeschema') });
+                //loadjscssfile('//rawgit.com/matthewmorrison/eda-web/master/libs/jquery.mousewheel.min.js', 'js', function() { loadedJs('eeschema') });
+                
+                //if('ontouchstart' in window)
+                    loadjscssfile('//rawgit.com/matthewmorrison/eda-web/master/libs/hammer.js', 'js', function() { loadedJs('hammer') });   
+            }
+        });
+    </script>
+
+	<style>
+        .eeschema {
+            position: absolute;
+            left: 0;
+            width: 100%;
+			top: 0;
+			bottom: 0;
+			overflow: hidden;
+			z-index: 50;
+			background-color: #fff;
+        }
         
-		/*e.preventDefault();
-	    zoomer = $(this);
-		var scroll = zoomer.scrollTop();
+        .eeschema-canvas-container {
+            position: absolute;
+			top: 0;
+            left: 0;
+			bottom: 20px;
+			right: 80px;
+			background-color: #fff;
+        }
+        
+        .canvas-container {
+            border: 1px solid #f00;
+        }
+        
+        .eeschema.panning .eeschema-canvas-container,
+        .eeschema.panning {
+            background-color: #ffc;
+        }
+        
+        .eeschema-coords {
+            float: right;
+        }
+        
+        .eeschema canvas {
+            position: absolute;
+/*            margin: 1000px 0;*/
+            height: 100%;
+        }
+        
+        .eeschema-panel-right {
+            position: absolute;
+            width: 80px;
+            top: 0;
+			bottom: 20px;
+            background-color: red;
+			right: 0;
+        }
 		
-		if(scroll < 1000) {	
-			ees.zoomIn();
+		.eeschema-panel-bottom {
+			position: absolute;
+			bottom: 0;
+			width: 100%;
+			height: 20px;
+			background-color: green;
 		}
-		else if(scroll > 1000) {
-			ees.zoomOut();
-		}
 		
-		zoomer.scrollTop(1000);*/
-	});
-	
-/*	this.panner.on('scroll', function(e) {	
-		var panner = $(this);
-		
-		var left = panner.scrollLeft();
-		var top = panner.scrollTop();
-		
-		ees.zoomer.css('left', left);
-			
-		ees.zoomer.css('top', top);
-		
-		if(ees.fcanvas.viewportTransform[4] > 0)
-		    left -= ees.fcanvas.viewportTransform[4];
+		.eeschema-canvas-touch {
+		    position: absolute;
+		    width: 100%;
+		    height: 100%;
+		    top: 0;
+		    left: 0;
 		    
-		if(ees.fcanvas.viewportTransform[5] > 0)
-		    top -= ees.fcanvas.viewportTransform[5];
-		
-	    ees.fcanvas.absolutePan(new fabric.Point(left, top));
-	    
-	    ees.updatePan();
-	});*/
-
-	//this.zoomer.scrollTop(1000);
+        }
+	</style>
+</head>
+<body>	
+	<div class="eeschema">
+	</div>
+	<script>
 	
-	/*this.fcanvas.on('mouse:down', function(obj) {
-		var dragHandle = function(obj) {
-			ees.canvasDrag(obj.e);
-		}
-	
-	    $(window).on('mousemove', '', dragHandle);
 		
-		ees.dragStatus = 'start';
-		ees.dragStart = [obj.e.clientX, obj.e.clientY];
-		ees.dragPanStart = [ees.fcanvas.viewportTransform[4], ees.fcanvas.viewportTransform[5]];
-		
-		var upEv = $(window).one({
-			mouseup: function() {
-				ees.dragStatus = 'none';
-				$(window).off('mousemove', '', dragHandle);
-				ees.updatePan();
-			}
-		});
-	});*/
-	
-	this.fcanvas.on('mouse:move', function(obj) {
-		var e = obj.e;	
-
-		ees.fcanvas.mouseX = e.clientX;
-		ees.fcanvas.mouseY = e.clientY;
-		var zoom = ees.fcanvas.getZoom();
-		
-		//ees.coords.html((e.clientX/zoom - ees.fcanvas.viewportTransform[4]/zoom) + ', ' + (e.clientY/zoom - ees.fcanvas.viewportTransform[5]/zoom));
-	});
-	
-	
-    /*var canvasHammer = new Hammer(this.canvasContainer.get(0));
-    
-    canvasHammer.on('panstart', function(e) {
-        ees.coords.html('pan');
-    	ees.dragPanStart = [ees.fcanvas.viewportTransform[4], ees.fcanvas.viewportTransform[5]];
-        ees.dragStatus = 'start';
-        
-        
-        ees.container.addClass('panning');
-        ees.panPreview.css('top', 0);
-        ees.panPreview.css('left', 0);
-        ees.panPreview.css('opacity', .5);
-    })
-    .on('panmove', function(e) {
-        ees.panPreview.css('top', e.deltaY);
-        ees.panPreview.css('left', e.deltaX);
-    
-       // var x = -ees.dragPanStart[0] - e.deltaX;
-        //var y = -ees.dragPanStart[1] - e.deltaY;   
-        //ees.fcanvas.absolutePan(new fabric.Point(x, y));
-    })
-    .on('panend', function(e) {
-        ees.dragStatus = 'none';
-        
-        ees.panPreview.css('top', 0);
-        ees.panPreview.css('left', 0);
-        ees.container.removeClass('panning');
-        var x = -ees.dragPanStart[0] - e.deltaX;
-        var y = -ees.dragPanStart[1] - e.deltaY;   
-        ees.fcanvas.absolutePan(new fabric.Point(x, y));
-    })
-    .on('pinchstart', function() {
-        this.coords.html('zoom');
-        ees.zoomOut();
-    });*/
-}
-
-//var screen = document.querySelector(".device-screen");
-
-
-
-
-EeSchema.prototype._initMobile = function() {
-
-}
-
-EeSchema.prototype.canvasDrag = function(e) {
-	if(this.dragStatus != 'dragging')
-		this.dragStatus = 'dragging';
-	
-	var x = this.dragStart[0] - this.fcanvas.mouseX  - this.dragPanStart[0];
-	var y = this.dragStart[1] - this.fcanvas.mouseY - this.dragPanStart[1];
-		
-	absolutePan(new fabric.Point(x, y));
-}
-
-function getScrollbarWidth() {
-  var div, body, W = window.browserScrollbarWidth;
-  if (W === undefined) {
-    body = document.body, div = document.createElement('div');
-    div.innerHTML = '<div style="width: 50px; height: 50px; position: absolute; left: -100px; top: -100px; overflow: auto;"><div style="width: 1px; height: 100px;"></div></div>';
-    div = div.firstChild;
-    body.appendChild(div);
-    W = window.browserScrollbarWidth = div.offsetWidth - div.clientWidth;
-    body.removeChild(div);
-  }
-  return W;
-};
-
-/*$(function() {
-    $('.eeschema').each(function(index, item) {
-        var ees = new EeSchema(item);
-        
-        $(item).data('eeschema', ees);
-    });
-});*/
-
-EeSchema.prototype.open = function(location) {
-    this.url = location;
-
-	$.ajax({
-	    dataType: 'jsonp',
-	    url: location,
-	    contentType: 'text/plain',
-	    jsonpCallback: 'jsonpTest',
-	    success: function() { console.log('success'); }
-	})
-	.done(function(response) {
-		console.log('Response: ', response);
-		this.parseSchematic(response);
-	});
-}
-
-EeSchema.prototype.parseSchematic = function(txt) {
-	var lines = txt.split('\n');
-	var section = '';
-
-	for(var l_index = 0; l_index < lines.length; l_index++) {
-		var line = lines[l_index];
-		
-		if(line[0] != '#') { //Skip comments
-			var props = line.match(/(?:[^\s"]+|"[^"]*")+/g);
+	function validatePropertyCount(count, min, max) {
+		if(min && count < min)
+			throw 'Expected a minimum of ' + min + ' properties, but found ' + count;
 			
-			if(props[0].indexOf('LIBS:') == 0 && !this.localMode) {
-			    var file = props[0].substring(5);
-				console.log('Load-', file);
-				
-				var path = this.location.substring(0, this.location.lastIndexOf('/')) + '/' + file;
-				
-				console.log('fetch: ' + path);
-				
-				$.ajax(path)
-				.done(function(response) {
-				    this.parseLibrary(response);
-				});
-			}
-			else if(props[0] == '$Descr') {
-				this.sheetSize = props[1];
-				this.sheetWidth = props[2];
-				this.sheetHeight = props[3];
-			}
-			else if(props[0] == '$Comp') {
-				l_index += this.parseComponent(lines.slice(l_index));
-			}
-			else if(props[0] == 'Wire' || props[0] == 'Entry') {
-                continue
-                    
-				var wire = {
-					type: props[0],
-					purpose: props[1],
-					characteristic: props[2],
-				}
-				
-				l_index++;
-				line = lines[l_index];
-				
-				props = line.match(/(?:[^\s"]+|"[^"]*")+/g);
-				
-				wire.x0 = props[0];
-				wire.y0 = props[1];
-				wire.x1 = props[2];
-				wire.y1 = props[3];
-
-				var l = new fabric.Line([ /*wire.x0, wire.y0,*/ 0, 0, wire.x1, wire.y1 ], {
-					stroke: 'black',
-					strokeWidth: 1,
-					left: wire.x0,
-					top: wire.y0
-				});
-				
-				l.lineType = wire.type;
-				l.linePurpose = wire.purpose;
-				l.lineCharacteristic = wire.characteristic;
-				
-				this.fcanvas.add(l);
-				this.wires.push(l);
-			}
-		}
+		if(max && count > max)
+			throw 'Expected a maximum of ' + max + ' properties, but found ' + count;
 	}
 	
-	console.log('Done parsing schematic: ', new Date());
 
 	
-	this.resetView();
-}
+	function loadTest() {
+		var testComp = 'DEF BEAD ?? 0 40 Y Y 1 L N\r\n' +
+'ALIAS one two three\r\n' +
+'F0 "??" 0 0 60 H V C CNN\r\n' +
+'F1 "BEAD" 0 0 60 H V C CNN\r\n' +
+'F2 "" 0 0 60 H V C CNN\r\n' +
+'F3 "" 0 0 60 H V C CNN\r\n' +
+'DRAW\r\n' +
+'A 0 -75 25 901 1799 1 1 0 N 0 -50 -25 -75\r\n' + 
+'A 0 -75 25 -1799 -901 1 1 0 N -25 -75 0 -100\r\n' +
+'A 0 -25 25 901 1799 1 1 0 N 0 0 -25 -25\r\n' +
+'A 0 -25 25 -1799 -901 1 1 0 N -25 -25 0 -50\r\n' +
+'A 0 25 25 901 1799 1 1 0 N 0 50 -25 25\r\n' +
+'A 0 25 25 -1799 -901 1 1 0 N -25 25 0 0\r\n' +
+'A 0 75 25 901 1799 1 1 0 N 0 100 -25 75\r\n' +
+'A 0 75 25 -1799 -901 1 1 0 N -25 75 0 50\r\n' +
+'X P$1 1 0 150 50 D 40 40 1 1 P\r\n' +
+'X 2 2 0 -150 50 U 40 40 1 1 P\r\n' +
+'ENDDRAW\r\n' +
+'ENDDEF';
 
-EeSchema.prototype.parseComponent = function(lines) {
-	var l_index = 0;
-	var center = this.fcanvas.getCenter();
-	var comp = {
-		fabric: null,
-		definition: null,
-		x: center.left,
-		y: center.top
-	};
-	
-	for(; l_index < lines.length; l_index++) {
-		var line = lines[l_index];
+		var mpu = 'DEF ~MPU-9150 MPU9150 0 1 N Y 1 L N\r\n' + 
+'F0 "MPU9150" 0 0 60 H V C CNN\r\n' + 
+'F1 "MPU-9150" 50 -100 60 H I C CNN\r\n' + 
+'F2 "" 0 0 60 H V C CNN\r\n' + 
+'F3 "" 0 0 60 H V C CNN\r\n' + 
+'DRAW\r\n' + 
+'P 2 1 0 0  -550 -450  550 -450 N\r\n' + 
+'P 2 1 0 0 -550 450 -550 -450 N\r\n' + 
+'P 2 1 0 0 550 -450 550 450 N\r\n' + 
+'P 2 1 0 0 550 450 -550 450 N\r\n' + 
+'X CLKIN1 1 -600 250 100 R 28 28 1 1 P\r\n' + 
+'X RESV2 2 -600 150 100 R 28 28 1 1 N\r\n' + 
+'X VDD3 3 -600 50 100 R 28 28 1 1 W\r\n' + 
+'X RESV4 4 -600 -50 100 R 28 28 1 1 N\r\n' + 
+'X RESV5 5 -600 -150 100 R 28 28 1 1 N\r\n' + 
+'X ES-DA6 6 -600 -250 100 R 28 28 1 1 B\r\n' + 
+'X ES-CL7 7 -250 -500 100 U 28 28 1 1 B\r\n' + 
+'X VLOGIC8 8 -150 -500 100 U 28 28 1 1 W\r\n' + 
+'X AD09 9 -50 -500 100 U 28 28 1 1 P\r\n' + 
+'X REGOUT10 10 50 -500 100 U 28 28 1 1 B\r\n' + 
+'X CPOUT20 20 150 500 100 D 28 28 1 1 B\r\n' + 
+'X FSYNC11 11 150 -500 100 U 28 28 1 1 B\r\n' + 
+'X RESV21 21 50 500 100 D 28 28 1 1 N\r\n' + 
+'X INT12 12 250 -500 100 U 28 28 1 1 B\r\n' + 
+'X CLKOUT22 22 -50 500 100 D 28 28 1 1 B\r\n' + 
+'X VDD13 13 600 -250 100 L 28 28 1 1 W\r\n' + 
+'X SCL23 23 -150 500 100 D 28 28 1 1 B\r\n' + 
+'X RESV14 14 600 -150 100 L 28 28 1 1 N\r\n' + 
+'X SDA24 24 -250 500 100 D 28 28 1 1 B\r\n' + 
+'X GND15 15 600 -50 100 L 28 28 1 1 W\r\n' + 
+'X RESV16 16 600 50 100 L 28 28 1 1 N\r\n' + 
+'X GND17 17 600 150 100 L 28 28 1 1 W\r\n' + 
+'X GND18 18 600 250 100 L 28 28 1 1 W\r\n' + 
+'X RESV19 19 250 500 100 D 28 28 1 1 N\r\n' + 
+'ENDDRAW\r\n' + 
+'ENDDEF';
 		
-		if(line[0] != '#') { //Skip comments
-			var props = line.match(/(?:[^\s"]+|"[^"]*")+/g);
-			
-			if(props[0] == '$Comp') {
-				
-			}
-			else if(props[0] == 'L') {
-				if(typeof this.libraries[props[1]] != 'undefined') {
-					comp.definition = this.libraries[props[1]];
-				}
-				else {
-					console.log('Unable to find definition for component: ', props[1]);
-				}
-			}
-			else if(props[0] == 'P') {
-				comp.x = props[1]/1;
-				comp.y = props[2]/1;
-			}
-			else if(props[0] == '$EndComp') {
-				break;
-			}
-		}
-	}
-	
-	if(comp.definition != null) {
-		comp.fabric = comp.definition.Create(center);
-		comp.fabric.selectable = false;
-		this.fcanvas.add(comp.fabric);
-		comp.fabric.setLeft(comp.x);
-		comp.fabric.setTop(comp.y);
-	}
-
-	this.components.push(comp);
-	
-	return l_index;
-}
-
-EeSchema.prototype.parseLibrary = function(txt) {
-	var lines = txt.split('\n');
-	var block = '';
-	var section = '';
-
-	for(var l_index = 0; l_index < lines.length; l_index++) {
-		var line = lines[l_index];
-
-		if(line[0] != '#') { //Skip comments
-			var props = line.match(/(?:[^\s"]+|"[^"]*")+/g);
-			
-			if(props[0] == 'DEF') {
-				var def = new ComponentDefinition();
-				l_index += def.parse(lines.slice(l_index));
-				
-				this.libraries[def.name] = def;
-			}
-			else if(block != '') {
-				block += line;
-				
-				if(props[0] == 'ENDDEF') {
-					
-				}
-			}
-		}
-	}
-}
-
-EeSchema.prototype.zoomIn = function() {
-		// TODO limit the max canvas zoom in
-		var x = this.fcanvas.mouseX;
-		var y = this.fcanvas.mouseY;
+	    var ees = new EeSchema($('.eeschema').first().get(0));
 		
-		this.fcanvas.zoomToPoint(new fabric.Point(x, y), this.fcanvas.getZoom() * this.SCALE_FACTOR);
-		
-		this.updatePan(true);
-}
-
-	// Zoom Out
-EeSchema.prototype.zoomOut = function() {
-		// TODO limit max cavas zoom out
-		var center = this.fcanvas.getCenter();
-		this.fcanvas.zoomToPoint(new fabric.Point(center.left, center.top), this.fcanvas.getZoom() * (1 / this.SCALE_FACTOR));
-		
-		this.updatePan(true);
-}
-
-EeSchema.prototype.updatePan = function(allowOverPan) {
-return;
-	var zoom = this.fcanvas.getZoom();
-	var zoomW = zoom * this.sheetWidth;
-    var zoomH = zoom * this.sheetHeight;
-    
-    if(allowOverPan) {
-	    if(this.fcanvas.viewportTransform[4] < 0)
-	        zoomW -= this.fcanvas.viewportTransform[4];
-
-        if(this.fcanvas.viewportTransform[5] < 0)
-            zoomH -= this.fcanvas.viewportTransform[5];
-    }
-
-	this.sizer.width(zoomW);
-	this.sizer.height(zoomH);
-	
-	this.panner.scrollLeft(-1 * this.fcanvas.viewportTransform[4]);
-	this.panner.scrollTop(-1 * this.fcanvas.viewportTransform[5]);
-	
-	//this.zoomer.css('left', this.panner.scrollLeft());
-	//this.zoomer.css('top', this.panner.scrollTop());
-}
-
-EeSchema.prototype.recalcScroll = function() {
-	var dwidth = this.fcanvas.getWidth()/this.sheetWidth;
-	var dheight = this.fcanvas.getHeight()/this.sheetHeight;
-}
-	
-EeSchema.prototype.resetView = function() {
-	var width = this.fcanvas.getWidth();
-	var height = this.fcanvas.getHeight()
-	var fit = 1;
-	var hRatio = width / this.sheetWidth;
-	var vRatio = height / this.sheetHeight;
-	var left = 0;
-	var top = 0;
-	
-	if(vRatio < hRatio) {
-		left = (width/hRatio - width/vRatio) * vRatio/2;
-		fit = vRatio;
+//		if(window.location.host == 'localhost' || window.location.protocol == 'file:') {
+			ees.localMode = true;
+			ees.parseLibrary(stereo_camera_board);
+			ees.parseSchematic(sch);
+//		}
+//		else {
+//			ees.open('https://rawgit.com/matthewmorrison/stereo-camera-board/master/kicad/stereo-camera-board.sch');
+//		}
 	}
-	else {
-		top = (height/vRatio - height/hRatio) * hRatio/2;
-		fit = hRatio;
-	}
+	</script>
 	
-	this.fcanvas.setZoom(fit);
-	this.fcanvas.absolutePan(new fabric.Point(left, top));
+	<script>
 	
-	this.updatePan(true);
-}
+		var sch = 'EESchema Schematic File Version 2\r\n' + 
+'LIBS:stereo-camera-board\r\n' + 
+'LIBS:power\r\n' + 
+'LIBS:led\r\n' + 
+'LIBS:custom\r\n' + 
+'LIBS:inductor-coilcraft\r\n' + 
+'LIBS:usb\r\n' + 
+'LIBS:transistor\r\n' + 
+'LIBS:jumper\r\n' + 
+'LIBS:sn74lvc2t45\r\n' + 
+'LIBS:transistor-fet\r\n' + 
+'LIBS:con-usb\r\n' + 
+'LIBS:mt9v032\r\n' + 
+'LIBS:switch-misc\r\n' + 
+'LIBS:con-hdrs40\r\n' + 
+'LIBS:d-zener\r\n' + 
+'LIBS:mpu-9250\r\n' + 
+'LIBS:atmel\r\n' + 
+'LIBS:cpol\r\n' + 
+'LIBS:stereo-camera-board-cache\r\n' + 
+'EELAYER 24 0\r\n' + 
+'EELAYER END\r\n' + 
+'$Descr A4 11693 8268\r\n' + 
+'encoding utf-8\r\n' + 
+'Sheet 1 1\r\n' + 
+'Title "big-camera.sch"\r\n' + 
+'Date "31 JUL 2013"\r\n' + 
+'Rev ""\r\n' + 
+'Comp ""\r\n' + 
+'Comment1 ""\r\n' + 
+'Comment2 ""\r\n' + 
+'Comment3 ""\r\n' + 
+'Comment4 ""\r\n' + 
+'$EndDescr\r\n' + 
+'$Comp\r\n' + 
+'L C_C C8\r\n' + 
+'U 1 1 520F18CE\r\n' + 
+'P 4850 800\r\n' + 
+'F 0 "C8" V 4900 900 30  0000 C CNN\r\n' + 
+'F 1 "100nF" V 4900 650 30  0000 C CNN\r\n' + 
+'F 2 "" H 4850 800 30  0001 C CNN\r\n' + 
+'F 3 "" H 4850 800 30  0001 C CNN\r\n' + 
+'	1    4850 800 \r\n' + 
+'	0    -1   -1   0   \r\n' + 
+'$EndComp\r\n' + 
+'$Comp\r\n' + 
+'L C_CPOL C1\r\n' + 
+'U 1 1 520F18E5\r\n' + 
+'P 2850 900\r\n' + 
+'F 0 "C1" V 2850 900 30  0000 C CNN\r\n' + 
+'F 1 "22uF" H 2915 802 30  0000 C CNN\r\n' + 
+'F 2 "" H 2850 900 30  0001 C CNN\r\n' + 
+'F 3 "" H 2850 900 30  0001 C CNN\r\n' + 
+'	1    2850 900 \r\n' + 
+'	1    0    0    -1  \r\n' + 
+'$EndComp\r\n' + 
+'$Comp\r\n' + 
+'L C_CPOL C5\r\n' + 
+'U 1 1 520F18E4\r\n' + 
+'P 3500 900\r\n' + 
+'F 0 "C5" V 3500 900 30  0000 C CNN\r\n' + 
+'F 1 "22uF" H 3563 803 30  0000 C CNN\r\n' + 
+'F 2 "" H 3500 900 30  0001 C CNN\r\n' + 
+'F 3 "" H 3500 900 30  0001 C CNN\r\n' + 
+'	1    3500 900 \r\n' + 
+'	1    0    0    -1  \r\n' + 
+'$EndComp\r\n' + 
+'$Comp\r\n' + 
+'L C_C C6\r\n' + 
+'U 1 1 520F18E3\r\n' + 
+'P 3900 900\r\n' + 
+'F 0 "C6" V 3900 900 30  0000 C CNN\r\n' + 
+'F 1 "1uF" V 3954 793 30  0000 C CNN\r\n' + 
+'F 2 "" H 3900 900 30  0001 C CNN\r\n' + 
+'F 3 "" H 3900 900 30  0001 C CNN\r\n' + 
+'	1    3900 900 \r\n' + 
+'	1    0    0    -1  \r\n' + 
+'$EndComp\r\n' + 
+'$Comp\r\n' + 
+'L C_C C7\r\n' + 
+'U 1 1 520F18E2\r\n' + 
+'P 4600 900\r\n' + 
+'F 0 "C7" V 4600 900 30  0000 C CNN\r\n' + 
+'F 1 "1uF" V 4600 800 30  0000 C CNN\r\n' + 
+'F 2 "" H 4600 900 30  0001 C CNN\r\n' + 
+'F 3 "" H 4600 900 30  0001 C CNN\r\n' + 
+'	1    4600 900 \r\n' + 
+'	1    0    0    -1  \r\n' + 
+'$EndComp\r\n' + 
+'$Comp\r\n' + 
+'L C_C C13\r\n' + 
+'U 1 1 520F18E1\r\n' + 
+'P 6250 1950\r\n' + 
+'F 0 "C13" V 6250 1950 30  0000 C CNN\r\n' + 
+'F 1 "100nF" V 6250 1850 30  0000 C CNN\r\n' + 
+'F 2 "" H 6250 1950 30  0001 C CNN\r\n' + 
+'F 3 "" H 6250 1950 30  0001 C CNN\r\n' + 
+'	1    6250 1950\r\n' + 
+'	1    0    0    -1  \r\n' + 
+'$EndComp\r\n' + 
+'$Comp\r\n' + 
+'L C_C C15\r\n' + 
+'U 1 1 520F18E0\r\n' + 
+'P 6350 1950\r\n' + 
+'F 0 "C15" V 6350 1950 30  0000 C CNN\r\n' + 
+'F 1 "100nF" V 6350 1850 30  0000 C CNN\r\n' + 
+'F 2 "" H 6350 1950 30  0001 C CNN\r\n' + 
+'F 3 "" H 6350 1950 30  0001 C CNN\r\n' + 
+'	1    6350 1950\r\n' + 
+'	1    0    0    -1  \r\n' + 
+'$EndComp\r\n' + 
+'$Comp\r\n' + 
+'L C_C C22\r\n' + 
+'U 1 1 520F18D6\r\n' + 
+'P 7600 1950\r\n' + 
+'F 0 "C22" V 7600 1950 30  0000 C CNN\r\n' + 
+'F 1 "100nF" V 7600 1850 30  0000 C CNN\r\n' + 
+'F 2 "" H 7600 1950 30  0001 C CNN\r\n' + 
+'F 3 "" H 7600 1950 30  0001 C CNN\r\n' + 
+'	1    7600 1950\r\n' + 
+'	1    0    0    -1  \r\n' + 
+'$EndComp\r\n' + 
+'$Comp\r\n' + 
+'L C_C C24\r\n' + 
+'U 1 1 520F18DE\r\n' + 
+'P 7700 1950\r\n' + 
+'F 0 "C24" V 7700 1950 30  0000 C CNN\r\n' + 
+'F 1 "100nF" V 7700 1850 30  0000 C CNN\r\n' + 
+'F 2 "" H 7700 1950 30  0001 C CNN\r\n' + 
+'F 3 "" H 7700 1950 30  0001 C CNN\r\n' + 
+'	1    7700 1950\r\n' + 
+'	1    0    0    -1  \r\n' + 
+'$EndComp\r\n' + 
+'$Comp\r\n' + 
+'L C_C C2\r\n' + 
+'U 1 1 520F18DF\r\n' + 
+'P 3250 3050\r\n' + 
+'F 0 "C2" V 3250 3050 30  0000 C CNN\r\n' + 
+'F 1 "100nF" V 3250 2950 30  0000 C CNN\r\n' + 
+'F 2 "" H 3250 3050 30  0001 C CNN\r\n' + 
+'F 3 "" H 3250 3050 30  0001 C CNN\r\n' + 
+'	1    3250 3050\r\n' + 
+'	1    0    0    -1  \r\n' + 
+'$EndComp\r\n' + 
+'$Comp\r\n' + 
+'L C_C C3\r\n' + 
+'U 1 1 520F18DC\r\n' + 
+'P 3350 3050\r\n' + 
+'F 0 "C3" V 3350 3050 30  0000 C CNN\r\n' + 
+'F 1 "100nF" V 3350 2950 30  0000 C CNN\r\n' + 
+'F 2 "" H 3350 3050 30  0001 C CNN\r\n' + 
+'F 3 "" H 3350 3050 30  0001 C CNN\r\n' + 
+'	1    3350 3050\r\n' + 
+'	1    0    0    -1  \r\n' + 
+'$EndComp\r\n' + 
+'$Comp\r\n' + 
+'L C_C C4\r\n' + 
+'U 1 1 520F18DB\r\n' + 
+'P 3450 3050\r\n' + 
+'F 0 "C4" V 3450 3050 30  0000 C CNN\r\n' + 
+'F 1 "100nF" V 3450 2950 30  0000 C CNN\r\n' + 
+'F 2 "" H 3450 3050 30  0001 C CNN\r\n' + 
+'F 3 "" H 3450 3050 30  0001 C CNN\r\n' + 
+'	1    3450 3050\r\n' + 
+'	1    0    0    -1  \r\n' + 
+'$EndComp\r\n' + 
+'$Comp\r\n' + 
+'L C_C C9\r\n' + 
+'U 1 1 520F18DA\r\n' + 
+'P 5650 3700\r\n' + 
+'F 0 "C9" V 5650 3700 30  0000 C CNN\r\n' + 
+'F 1 "100nF" V 5650 3600 30  0000 C CNN\r\n' + 
+'F 2 "" H 5650 3700 30  0001 C CNN\r\n' + 
+'F 3 "" H 5650 3700 30  0001 C CNN\r\n' + 
+'	1    5650 3700\r\n' + 
+'	1    0    0    -1  \r\n' + 
+'$EndComp\r\n' + 
+'$Comp\r\n' + 
+'L C_C C10\r\n' + 
+'U 1 1 520F18D9\r\n' + 
+'P 5750 3700\r\n' + 
+'F 0 "C10" V 5750 3700 30  0000 C CNN\r\n' + 
+'F 1 "100nF" V 5750 3600 30  0000 C CNN\r\n' + 
+'F 2 "" H 5750 3700 30  0001 C CNN\r\n' + 
+'F 3 "" H 5750 3700 30  0001 C CNN\r\n' + 
+'	1    5750 3700\r\n' + 
+'	1    0    0    -1  \r\n' + 
+'$EndComp\r\n' + 
+'$Comp\r\n' + 
+'L C_C C12\r\n' + 
+'U 1 1 520F18D8\r\n' + 
+'P 5850 3700\r\n' + 
+'F 0 "C12" V 5850 3700 30  0000 C CNN\r\n' + 
+'F 1 "1uF" V 5850 3600 30  0000 C CNN\r\n' + 
+'F 2 "" H 5850 3700 30  0001 C CNN\r\n' + 
+'F 3 "" H 5850 3700 30  0001 C CNN\r\n' + 
+'	1    5850 3700\r\n' + 
+'	1    0    0    -1  \r\n' + 
+'$EndComp\r\n' + 
+'$Comp\r\n' + 
+'L C_C C18\r\n' + 
+'U 1 1 520F18D7\r\n' + 
+'P 6600 3350\r\n' + 
+'F 0 "C18" V 6575 3375 30  0000 C CNN\r\n' + 
+'F 1 "100nF" V 6575 3225 30  0000 C CNN\r\n' + 
+'F 2 "" H 6600 3350 30  0001 C CNN\r\n' + 
+'F 3 "" H 6600 3350 30  0001 C CNN\r\n' + 
+'	1    6600 3350\r\n' + 
+'	1    0    0    -1  \r\n' + 
+'$EndComp\r\n' + 
+'$Comp\r\n' + 
+'L C_C C19\r\n' + 
+'U 1 1 520F18EA\r\n' + 
+'P 6700 3350\r\n' + 
+'F 0 "C19" V 6675 3375 30  0000 C CNN\r\n' + 
+'F 1 "100nF" V 6675 3225 30  0000 C CNN\r\n' + 
+'F 2 "" H 6700 3350 30  0001 C CNN\r\n' + 
+'F 3 "" H 6700 3350 30  0001 C CNN\r\n' + 
+'	1    6700 3350\r\n' + 
+'	1    0    0    -1  \r\n' + 
+'$EndComp\r\n' + 
+'$Comp\r\n' + 
+'L C_C C20\r\n' + 
+'U 1 1 520F18F1\r\n' + 
+'P 6800 3350\r\n' + 
+'F 0 "C20" V 6775 3375 30  0000 C CNN\r\n' + 
+'F 1 "100nF" V 6775 3225 30  0000 C CNN\r\n' + 
+'F 2 "" H 6800 3350 30  0001 C CNN\r\n' + 
+'F 3 "" H 6800 3350 30  0001 C CNN\r\n' + 
+'	1    6800 3350\r\n' + 
+'	1    0    0    -1  \r\n' + 
+'$EndComp\r\n' + 
+'$Comp\r\n' + 
+'L C_C C25\r\n' + 
+'U 1 1 520F18F2\r\n' + 
+'P 11100 1600\r\n' + 
+'F 0 "C25" V 11100 1600 30  0000 C CNN\r\n' + 
+'F 1 "100nF" V 11100 1500 30  0000 C CNN\r\n' + 
+'F 2 "" H 11100 1600 30  0001 C CNN\r\n' + 
+'F 3 "" H 11100 1600 30  0001 C CNN\r\n' + 
+'	1    11100 1600\r\n' + 
+'	1    0    0    -1  \r\n' + 
+'$EndComp\r\n' + 
+'$Comp\r\n' + 
+'L D_D-ZENER D1\r\n' + 
+'U 1 1 520F18EF\r\n' + 
+'P 4850 900\r\n' + 
+'F 0 "D1" H 4950 850 30  0000 C CNN\r\n' + 
+'F 1 "SMAJ5.0A" H 4850 950 30  0000 C CNN\r\n' + 
+'F 2 "" H 4850 900 30  0001 C CNN\r\n' + 
+'F 3 "" H 4850 900 30  0001 C CNN\r\n' + 
+'	1    4850 900 \r\n' + 
+'	-1   0    0    1   \r\n' + 
+'$EndComp\r\n' + 
+'$Comp\r\n' + 
+'L JP_JP4E EXT_SENSOR1\r\n' + 
+'U 1 1 520F18E9\r\n' + 
+'P 11150 1150\r\n' + 
+'F 0 "EXT_SENSOR1" V 11050 1100 30  0000 C CNN\r\n' + 
+'F 1 "~" H 11150 1100 30  0001 C CNN\r\n' + 
+'F 2 "" H 11150 1100 30  0001 C CNN\r\n' + 
+'F 3 "" H 11150 1100 30  0001 C CNN\r\n' + 
+'	1    11150 1150\r\n' + 
+'	0    1    1    0   \r\n' + 
+'$EndComp\r\n' + 
+'$Comp\r\n' + 
+'L FRAME_FRAME_B_L FRAME1\r\n' + 
+'U 1 1 520F18E6\r\n' + 
+'P 300 5800\r\n' + 
+'F 0 "FRAME1" H 300 5800 30  0001 C CNN\r\n' + 
+'F 1 "~" H 300 5800 30  0001 C CNN\r\n' + 
+'F 2 "" H 300 5800 30  0001 C CNN\r\n' + 
+'F 3 "" H 300 5800 30  0001 C CNN\r\n' + 
+'	1    300  5800\r\n' + 
+'	1    0    0    -1  \r\n' + 
+'$EndComp\r\n' + 
+'$Comp\r\n' + 
+'L FRAME_FRAME_B_L FRAME2\r\n' + 
+'U 1 1 520F18C4\r\n' + 
+'P 8750 5700\r\n' + 
+'F 0 "FRAME2" H 8750 5700 30  0001 C CNN\r\n' + 
+'F 1 "~" H 8750 5700 30  0001 C CNN\r\n' + 
+'F 2 "" H 8750 5700 30  0001 C CNN\r\n' + 
+'F 3 "" H 8750 5700 30  0001 C CNN\r\n' + 
+'	1    8750 5700\r\n' + 
+'	1    0    0    -1  \r\n' + 
+'$EndComp\r\n' + 
+'$Comp\r\n' + 
+'L IC_LDO1117 IC1\r\n' + 
+'U 1 1 520F18C3\r\n' + 
+'P 3150 800\r\n' + 
+'F 0 "IC1" H 3000 900 30  0000 C CNN\r\n' + 
+'F 1 "ZLDO1117G33TA" H 3178 659 30  0000 C CNN\r\n' + 
+'F 2 "" H 3150 800 30  0001 C CNN\r\n' + 
+'F 3 "" H 3150 800 30  0001 C CNN\r\n' + 
+'	1    3150 800 \r\n' + 
+'	1    0    0    -1  \r\n' + 
+'$EndComp\r\n' + 
+'$Comp\r\n' + 
+'L IC_MCP1700 IC2\r\n' + 
+'U 1 1 520F18C2\r\n' + 
+'P 4250 800\r\n' + 
+'F 0 "IC2" H 4400 650 30  0000 C CNN\r\n' + 
+'F 1 "MCP1700T-2502E/TT" H 4050 900 30  0000 C CNN\r\n' + 
+'F 2 "" H 4250 800 30  0001 C CNN\r\n' + 
+'F 3 "" H 4250 800 30  0001 C CNN\r\n' + 
+'	1    4250 800 \r\n' + 
+'	1    0    0    -1  \r\n' + 
+'$EndComp\r\n' + 
+'$Comp\r\n' + 
+'L IC_SN74LVC1T45 IC3\r\n' + 
+'U 1 1 520F18C1\r\n' + 
+'P 6950 800\r\n' + 
+'F 0 "IC3" H 6750 900 30  0000 C CNN\r\n' + 
+'F 1 "SN74LVC1T45DCKR" H 7100 650 30  0000 C CNN\r\n' + 
+'F 2 "" H 6950 800 30  0001 C CNN\r\n' + 
+'F 3 "" H 6950 800 30  0001 C CNN\r\n' + 
+'	1    6950 800 \r\n' + 
+'	-1   0    0    1   \r\n' + 
+'$EndComp\r\n' + 
+'$Comp\r\n' + 
+'L IC_SN74LVC1T45 IC4\r\n' + 
+'U 1 1 520F18C0\r\n' + 
+'P 6950 1050\r\n' + 
+'F 0 "IC4" H 6750 1150 30  0000 C CNN\r\n' + 
+'F 1 "SN74LVC1T45DCKR" H 7100 900 30  0000 C CNN\r\n' + 
+'F 2 "" H 6950 1050 30  0001 C CNN\r\n' + 
+'F 3 "" H 6950 1050 30  0001 C CNN\r\n' + 
+'	1    6950 1050\r\n' + 
+'	-1   0    0    1   \r\n' + 
+'$EndComp\r\n' + 
+'$Comp\r\n' + 
+'L MT9V032 S2\r\n' + 
+'U 1 1 520F18BF\r\n' + 
+'P 4650 3750\r\n' + 
+'F 0 "S2" H 4050 4300 30  0000 C CNN\r\n' + 
+'F 1 "MT9V032" H 4050 4250 30  0000 C CNN\r\n' + 
+'F 2 "" H 4650 3750 30  0001 C CNN\r\n' + 
+'F 3 "" H 4650 3750 30  0001 C CNN\r\n' + 
+'	1    4650 3750\r\n' + 
+'	1    0    0    -1  \r\n' + 
+'$EndComp\r\n' + 
+'$Comp\r\n' + 
+'L J_HEADER-01X02 J1\r\n' + 
+'U 1 1 520F18BE\r\n' + 
+'P 4850 550\r\n' + 
+'F 0 "J1" H 4800 600 30  0000 C CNN\r\n' + 
+'F 1 "~" H 4850 550 30  0001 C CNN\r\n' + 
+'F 2 "" H 4850 550 30  0001 C CNN\r\n' + 
+'F 3 "" H 4850 550 30  0001 C CNN\r\n' + 
+'	1    4850 550 \r\n' + 
+'	0    -1   -1   0   \r\n' + 
+'$EndComp\r\n' + 
+'$Comp\r\n' + 
+'L JP_JP4Q JP1\r\n' + 
+'U 1 1 520F18BA\r\n' + 
+'P 3650 2300\r\n' + 
+'F 0 "JP1" V 3550 2200 30  0000 C CNN\r\n' + 
+'F 1 "~" H 3650 2300 30  0001 C CNN\r\n' + 
+'F 2 "" H 3650 2300 30  0001 C CNN\r\n' + 
+'F 3 "" H 3650 2300 30  0001 C CNN\r\n' + 
+'	1    3650 2300\r\n' + 
+'	0    1    1    0   \r\n' + 
+'$EndComp\r\n' + 
+'$Comp\r\n' + 
+'L LH_M12X05 CMT1\r\n' + 
+'U 1 1 520F18B9\r\n' + 
+'P 3350 4550\r\n' + 
+'F 0 "CMT1" H 3250 4500 30  0000 C CNN\r\n' + 
+'F 1 "~" H 3350 4550 30  0001 C CNN\r\n' + 
+'F 2 "" H 3350 4550 30  0001 C CNN\r\n' + 
+'F 3 "" H 3350 4550 30  0001 C CNN\r\n' + 
+'	1    3350 4550\r\n' + 
+'	1    0    0    -1  \r\n' + 
+'$EndComp\r\n' + 
+'$Comp\r\n' + 
+'L JP_PINHD-2X3 PDIJTAG1\r\n' + 
+'U 1 1 520F18B7\r\n' + 
+'P 6150 5850\r\n' + 
+'F 0 "PDIJTAG1" H 6000 5950 30  0000 C CNN\r\n' + 
+'F 1 "~" H 6150 5850 30  0001 C CNN\r\n' + 
+'F 2 "" H 6150 5850 30  0001 C CNN\r\n' + 
+'F 3 "" H 6150 5850 30  0001 C CNN\r\n' + 
+'	1    6150 5850\r\n' + 
+'	1    0    0    -1  \r\n' + 
+'$EndComp\r\n' + 
+'$Comp\r\n' + 
+'L R_R R8\r\n' + 
+'U 1 1 520F18B6\r\n' + 
+'P 6150 700\r\n' + 
+'F 0 "R8" H 6200 700 30  0000 C CNN\r\n' + 
+'F 1 "10K" H 6050 700 30  0000 C CNN\r\n' + 
+'F 2 "" H 6150 700 30  0001 C CNN\r\n' + 
+'F 3 "" H 6150 700 30  0001 C CNN\r\n' + 
+'	1    6150 700 \r\n' + 
+'	1    0    0    -1  \r\n' + 
+'$EndComp\r\n' + 
+'$Comp\r\n' + 
+'L R_R R6\r\n' + 
+'U 1 1 520F18B5\r\n' + 
+'P 5850 750\r\n' + 
+'F 0 "R6" H 5800 700 30  0000 C CNN\r\n' + 
+'F 1 "0R" H 5850 800 30  0000 C CNN\r\n' + 
+'F 2 "" H 5850 750 30  0001 C CNN\r\n' + 
+'F 3 "" H 5850 750 30  0001 C CNN\r\n' + 
+'	1    5850 750 \r\n' + 
+'	1    0    0    -1  \r\n' + 
+'$EndComp\r\n' + 
+'$Comp\r\n' + 
+'L R_R R9\r\n' + 
+'U 1 1 520F18BD\r\n' + 
+'P 6150 950\r\n' + 
+'F 0 "R9" H 6200 950 30  0000 C CNN\r\n' + 
+'F 1 "10K" H 6050 950 30  0000 C CNN\r\n' + 
+'F 2 "" H 6150 950 30  0001 C CNN\r\n' + 
+'F 3 "" H 6150 950 30  0001 C CNN\r\n' + 
+'	1    6150 950 \r\n' + 
+'	1    0    0    -1  \r\n' + 
+'$EndComp\r\n' + 
+'$Comp\r\n' + 
+'L R_R R3\r\n' + 
+'U 1 1 520F18D3\r\n' + 
+'P 5450 5750\r\n' + 
+'F 0 "R3" H 5550 5750 30  0000 C CNN\r\n' + 
+'F 1 "1K" H 5400 5750 30  0000 C CNN\r\n' + 
+'F 2 "" H 5450 5750 30  0001 C CNN\r\n' + 
+'F 3 "" H 5450 5750 30  0001 C CNN\r\n' + 
+'	1    5450 5750\r\n' + 
+'	0    -1   -1   0   \r\n' + 
+'$EndComp\r\n' + 
+'$Comp\r\n' + 
+'L R_R R4\r\n' + 
+'U 1 1 520F18D2\r\n' + 
+'P 5500 5750\r\n' + 
+'F 0 "R4" H 5600 5750 30  0000 C CNN\r\n' + 
+'F 1 "1K" H 5450 5750 30  0000 C CNN\r\n' + 
+'F 2 "" H 5500 5750 30  0001 C CNN\r\n' + 
+'F 3 "" H 5500 5750 30  0001 C CNN\r\n' + 
+'	1    5500 5750\r\n' + 
+'	0    -1   -1   0   \r\n' + 
+'$EndComp\r\n' + 
+'$Comp\r\n' + 
+'L R_R R16\r\n' + 
+'U 1 1 520F18D1\r\n' + 
+'P 6000 2100\r\n' + 
+'F 0 "R16" H 6000 2000 30  0000 C CNN\r\n' + 
+'F 1 "1M" H 6000 2050 30  0000 C CNN\r\n' + 
+'F 2 "" H 6000 2100 30  0001 C CNN\r\n' + 
+'F 3 "" H 6000 2100 30  0001 C CNN\r\n' + 
+'	1    6000 2100\r\n' + 
+'	1    0    0    -1  \r\n' + 
+'$EndComp\r\n' + 
+'$Comp\r\n' + 
+'L R_R R11\r\n' + 
+'U 1 1 520F18D0\r\n' + 
+'P 10300 4350\r\n' + 
+'F 0 "R11" H 10350 4350 30  0000 C CNN\r\n' + 
+'F 1 "1K" H 10200 4350 30  0000 C CNN\r\n' + 
+'F 2 "" H 10300 4350 30  0001 C CNN\r\n' + 
+'F 3 "" H 10300 4350 30  0001 C CNN\r\n' + 
+'	1    10300 4350\r\n' + 
+'	1    0    0    -1  \r\n' + 
+'$EndComp\r\n' + 
+'$Comp\r\n' + 
+'L R_R R12\r\n' + 
+'U 1 1 520F18CF\r\n' + 
+'P 10300 4500\r\n' + 
+'F 0 "R12" H 10350 4500 30  0000 C CNN\r\n' + 
+'F 1 "1K" H 10200 4500 30  0000 C CNN\r\n' + 
+'F 2 "" H 10300 4500 30  0001 C CNN\r\n' + 
+'F 3 "" H 10300 4500 30  0001 C CNN\r\n' + 
+'	1    10300 4500\r\n' + 
+'	1    0    0    -1  \r\n' + 
+'$EndComp\r\n' + 
+'$Comp\r\n' + 
+'L R_R R13\r\n' + 
+'U 1 1 520F18C5\r\n' + 
+'P 10300 4650\r\n' + 
+'F 0 "R13" H 10350 4650 30  0000 C CNN\r\n' + 
+'F 1 "1K" H 10200 4650 30  0000 C CNN\r\n' + 
+'F 2 "" H 10300 4650 30  0001 C CNN\r\n' + 
+'F 3 "" H 10300 4650 30  0001 C CNN\r\n' + 
+'	1    10300 4650\r\n' + 
+'	1    0    0    -1  \r\n' + 
+'$EndComp\r\n' + 
+'$Comp\r\n' + 
+'L R_R R5\r\n' + 
+'U 1 1 520F18CD\r\n' + 
+'P 5650 4200\r\n' + 
+'F 0 "R5" H 5700 4200 30  0000 C CNN\r\n' + 
+'F 1 "1K" H 5600 4200 30  0000 C CNN\r\n' + 
+'F 2 "" H 5650 4200 30  0001 C CNN\r\n' + 
+'F 3 "" H 5650 4200 30  0001 C CNN\r\n' + 
+'	1    5650 4200\r\n' + 
+'	0    -1   -1   0   \r\n' + 
+'$EndComp\r\n' + 
+'$Comp\r\n' + 
+'L R_R R1\r\n' + 
+'U 1 1 520F18CC\r\n' + 
+'P 3250 2300\r\n' + 
+'F 0 "R1" H 3300 2300 30  0000 C CNN\r\n' + 
+'F 1 "1K" H 3200 2300 30  0000 C CNN\r\n' + 
+'F 2 "" H 3250 2300 30  0001 C CNN\r\n' + 
+'F 3 "" H 3250 2300 30  0001 C CNN\r\n' + 
+'	1    3250 2300\r\n' + 
+'	1    0    0    -1  \r\n' + 
+'$EndComp\r\n' + 
+'$Comp\r\n' + 
+'L R_R R2\r\n' + 
+'U 1 1 520F18CB\r\n' + 
+'P 3250 2400\r\n' + 
+'F 0 "R2" H 3300 2400 30  0000 C CNN\r\n' + 
+'F 1 "1K" H 3200 2400 30  0000 C CNN\r\n' + 
+'F 2 "" H 3250 2400 30  0001 C CNN\r\n' + 
+'F 3 "" H 3250 2400 30  0001 C CNN\r\n' + 
+'	1    3250 2400\r\n' + 
+'	1    0    0    -1  \r\n' + 
+'$EndComp\r\n' + 
+'Text Label 5868 3695 0    44   ~ 0\r\n' + 
+'SYSCLK\r\n' + 
+'$Comp\r\n' + 
+'L C_C C17\r\n' + 
+'U 1 1 51F99F54\r\n' + 
+'P 6500 3350\r\n' + 
+'F 0 "C17" V 6475 3375 30  0000 C CNN\r\n' + 
+'F 1 "100nF" V 6475 3225 30  0000 C CNN\r\n' + 
+'F 2 "" H 6500 3350 30  0001 C CNN\r\n' + 
+'F 3 "" H 6500 3350 30  0001 C CNN\r\n' + 
+'	1    6500 3350\r\n' + 
+'	1    0    0    -1  \r\n' + 
+'$EndComp\r\n' + 
+'$Comp\r\n' + 
+'L C_C C16\r\n' + 
+'U 1 1 51F99F5A\r\n' + 
+'P 6400 3350\r\n' + 
+'F 0 "C16" V 6375 3375 30  0000 C CNN\r\n' + 
+'F 1 "100nF" V 6375 3225 30  0000 C CNN\r\n' + 
+'F 2 "" H 6400 3350 30  0001 C CNN\r\n' + 
+'F 3 "" H 6400 3350 30  0001 C CNN\r\n' + 
+'	1    6400 3350\r\n' + 
+'	1    0    0    -1  \r\n' + 
+'$EndComp\r\n' + 
+'$Comp\r\n' + 
+'L R_R R15\r\n' + 
+'U 1 1 51F9DBB2\r\n' + 
+'P 8800 5750\r\n' + 
+'F 0 "R15" H 8750 5700 30  0000 C CNN\r\n' + 
+'F 1 "100R" H 8800 5800 30  0000 C CNN\r\n' + 
+'F 2 "" H 8800 5750 30  0001 C CNN\r\n' + 
+'F 3 "" H 8800 5750 30  0001 C CNN\r\n' + 
+'	1    8800 5750\r\n' + 
+'	0    -1   -1   0   \r\n' + 
+'$EndComp\r\n' + 
+'$Comp\r\n' + 
+'L R_R R14\r\n' + 
+'U 1 1 51F9DBBD\r\n' + 
+'P 8700 5650\r\n' + 
+'F 0 "R14" H 8750 5700 30  0000 C CNN\r\n' + 
+'F 1 "150R" H 8700 5750 30  0000 C CNN\r\n' + 
+'F 2 "" H 8700 5650 30  0001 C CNN\r\n' + 
+'F 3 "" H 8700 5650 30  0001 C CNN\r\n' + 
+'	1    8700 5650\r\n' + 
+'	1    0    0    -1  \r\n' + 
+'$EndComp\r\n' + 
+'$Comp\r\n' + 
+'L C_C C11\r\n' + 
+'U 1 1 51F99F97\r\n' + 
+'P 5800 4500\r\n' + 
+'F 0 "C11" V 5750 4600 30  0000 C CNN\r\n' + 
+'F 1 "100nF" V 5750 4450 30  0000 C CNN\r\n' + 
+'F 2 "" H 5800 4500 30  0001 C CNN\r\n' + 
+'F 3 "" H 5800 4500 30  0001 C CNN\r\n' + 
+'	1    5800 4500\r\n' + 
+'	1    0    0    -1  \r\n' + 
+'$EndComp\r\n' + 
+'$Comp\r\n' + 
+'L +5V #PWR3\r\n' + 
+'U 1 1 520EED47\r\n' + 
+'P 2850 600\r\n' + 
+'F 0 "#PWR3" V 2850 600 50  0001 L BNN\r\n' + 
+'F 1 "+5V" V 2900 600 30  0000 L BNN\r\n' + 
+'F 2 "" H 2850 600 60  0000 C CNN\r\n' + 
+'F 3 "" H 2850 600 60  0000 C CNN\r\n' + 
+'	1    2850 600 \r\n' + 
+'	1    0    0    -1  \r\n' + 
+'$EndComp\r\n' + 
+'$Comp\r\n' + 
+'L +5V #PWR12\r\n' + 
+'U 1 1 520EEDD5\r\n' + 
+'P 4700 600\r\n' + 
+'F 0 "#PWR12" V 4700 600 50  0001 L BNN\r\n' + 
+'F 1 "+5V" V 4750 600 30  0000 L BNN\r\n' + 
+'F 2 "" H 4700 600 60  0000 C CNN\r\n' + 
+'F 3 "" H 4700 600 60  0000 C CNN\r\n' + 
+'	1    4700 600 \r\n' + 
+'	1    0    0    -1  \r\n' + 
+'$EndComp\r\n' + 
+'$Comp\r\n' + 
+'L +3.3V #PWR6\r\n' + 
+'U 1 1 520EEEA5\r\n' + 
+'P 3700 600\r\n' + 
+'F 0 "#PWR6" V 3700 600 50  0001 L BNN\r\n' + 
+'F 1 "+3.3V" V 3750 600 30  0000 L BNN\r\n' + 
+'F 2 "" H 3700 600 60  0000 C CNN\r\n' + 
+'F 3 "" H 3700 600 60  0000 C CNN\r\n' + 
+'	1    3700 600 \r\n' + 
+'	1    0    0    -1  \r\n' + 
+'$EndComp\r\n' + 
+'$Comp\r\n' + 
+'L +2.5V #PWR11\r\n' + 
+'U 1 1 520EEEB4\r\n' + 
+'P 4600 600\r\n' + 
+'F 0 "#PWR11" V 4600 600 50  0001 L BNN\r\n' + 
+'F 1 "+2.5V" V 4650 600 30  0000 L BNN\r\n' + 
+'F 2 "" H 4600 600 60  0000 C CNN\r\n' + 
+'F 3 "" H 4600 600 60  0000 C CNN\r\n' + 
+'	1    4600 600 \r\n' + 
+'	1    0    0    -1  \r\n' + 
+'$EndComp\r\n' + 
+'$Comp\r\n' + 
+'L GND #PWR13\r\n' + 
+'U 1 1 520EEED7\r\n' + 
+'P 5000 1000\r\n' + 
+'F 0 "#PWR13" H 5000 1000 30  0001 L BNN\r\n' + 
+'F 1 "GND" H 4952 920 30  0000 L BNN\r\n' + 
+'F 2 "GND" H 5000 1000 60  0000 C CNN\r\n' + 
+'F 3 "" H 5000 1000 60  0000 C CNN\r\n' + 
+'	1    5000 1000\r\n' + 
+'	1    0    0    -1  \r\n' + 
+'$EndComp\r\n' + 
+'$Comp\r\n' + 
+'L +2.5V #PWR22\r\n' + 
+'U 1 1 520EEEE6\r\n' + 
+'P 6350 600\r\n' + 
+'F 0 "#PWR22" V 6350 600 50  0001 L BNN\r\n' + 
+'F 1 "+2.5V" V 6400 600 30  0000 L BNN\r\n' + 
+'F 2 "" H 6350 600 60  0000 C CNN\r\n' + 
+'F 3 "" H 6350 600 60  0000 C CNN\r\n' + 
+'	1    6350 600 \r\n' + 
+'	1    0    0    -1  \r\n' + 
+'$EndComp\r\n' + 
+'$Comp\r\n' + 
+'L +3.3V #PWR30\r\n' + 
+'U 1 1 520EEEF5\r\n' + 
+'P 7450 600\r\n' + 
+'F 0 "#PWR30" V 7450 600 50  0001 L BNN\r\n' + 
+'F 1 "+3.3V" V 7500 600 30  0000 L BNN\r\n' + 
+'F 2 "" H 7450 600 60  0000 C CNN\r\n' + 
+'F 3 "" H 7450 600 60  0000 C CNN\r\n' + 
+'	1    7450 600 \r\n' + 
+'	1    0    0    -1  \r\n' + 
+'$EndComp\r\n' + 
+'$Comp\r\n' + 
+'L GND #PWR26\r\n' + 
+'U 1 1 520EEF04\r\n' + 
+'P 6800 2200\r\n' + 
+'F 0 "#PWR26" H 6800 2200 30  0001 L BNN\r\n' + 
+'F 1 "GND" H 6752 2120 30  0000 L BNN\r\n' + 
+'F 2 "GND" H 6800 2200 60  0000 C CNN\r\n' + 
+'F 3 "" H 6800 2200 60  0000 C CNN\r\n' + 
+'	1    6800 2200\r\n' + 
+'	1    0    0    -1  \r\n' + 
+'$EndComp\r\n' + 
+'$Comp\r\n' + 
+'L GND #PWR21\r\n' + 
+'U 1 1 520EEF6D\r\n' + 
+'P 6100 2250\r\n' + 
+'F 0 "#PWR21" H 6100 2250 30  0001 L BNN\r\n' + 
+'F 1 "GND" H 6052 2170 30  0000 L BNN\r\n' + 
+'F 2 "GND" H 6100 2250 60  0000 C CNN\r\n' + 
+'F 3 "" H 6100 2250 60  0000 C CNN\r\n' + 
+'	1    6100 2250\r\n' + 
+'	1    0    0    -1  \r\n' + 
+'$EndComp\r\n' + 
+'$Comp\r\n' + 
+'L GND #PWR33\r\n' + 
+'U 1 1 520EEF7C\r\n' + 
+'P 8600 5700\r\n' + 
+'F 0 "#PWR33" H 8600 5700 30  0001 L BNN\r\n' + 
+'F 1 "GND" H 8552 5620 30  0000 L BNN\r\n' + 
+'F 2 "GND" H 8600 5700 60  0000 C CNN\r\n' + 
+'F 3 "" H 8600 5700 60  0000 C CNN\r\n' + 
+'	1    8600 5700\r\n' + 
+'	1    0    0    -1  \r\n' + 
+'$EndComp\r\n' + 
+'$Comp\r\n' + 
+'L GND #PWR52\r\n' + 
+'U 1 1 520EEF8B\r\n' + 
+'P 11100 1750\r\n' + 
+'F 0 "#PWR52" H 11100 1750 30  0001 L BNN\r\n' + 
+'F 1 "GND" H 11052 1670 30  0000 L BNN\r\n' + 
+'F 2 "GND" H 11100 1750 60  0000 C CNN\r\n' + 
+'F 3 "" H 11100 1750 60  0000 C CNN\r\n' + 
+'	1    11100 1750\r\n' + 
+'	1    0    0    -1  \r\n' + 
+'$EndComp\r\n' + 
+'$Comp\r\n' + 
+'L +3.3V #PWR51\r\n' + 
+'U 1 1 520EEFB8\r\n' + 
+'P 11100 1500\r\n' + 
+'F 0 "#PWR51" V 11100 1500 50  0001 L BNN\r\n' + 
+'F 1 "+3.3V" V 11150 1500 30  0000 L BNN\r\n' + 
+'F 2 "" H 11100 1500 60  0000 C CNN\r\n' + 
+'F 3 "" H 11100 1500 60  0000 C CNN\r\n' + 
+'	1    11100 1500\r\n' + 
+'	1    0    0    -1  \r\n' + 
+'$EndComp\r\n' + 
+'$Comp\r\n' + 
+'L GND #PWR24\r\n' + 
+'U 1 1 520EEFC7\r\n' + 
+'P 6500 5950\r\n' + 
+'F 0 "#PWR24" H 6500 5950 30  0001 L BNN\r\n' + 
+'F 1 "GND" H 6452 5870 30  0000 L BNN\r\n' + 
+'F 2 "GND" H 6500 5950 60  0000 C CNN\r\n' + 
+'F 3 "" H 6500 5950 60  0000 C CNN\r\n' + 
+'	1    6500 5950\r\n' + 
+'	1    0    0    -1  \r\n' + 
+'$EndComp\r\n' + 
+'$Comp\r\n' + 
+'L +3.3V #PWR23\r\n' + 
+'U 1 1 520EEFD6\r\n' + 
+'P 6400 5750\r\n' + 
+'F 0 "#PWR23" V 6400 5750 50  0001 L BNN\r\n' + 
+'F 1 "+3.3V" V 6450 5750 30  0000 L BNN\r\n' + 
+'F 2 "" H 6400 5750 60  0000 C CNN\r\n' + 
+'F 3 "" H 6400 5750 60  0000 C CNN\r\n' + 
+'	1    6400 5750\r\n' + 
+'	1    0    0    -1  \r\n' + 
+'$EndComp\r\n' + 
+'$Comp\r\n' + 
+'L GND #PWR17\r\n' + 
+'U 1 1 520EEFE5\r\n' + 
+'P 5800 4650\r\n' + 
+'F 0 "#PWR17" H 5800 4650 30  0001 L BNN\r\n' + 
+'F 1 "GND" H 5752 4570 30  0000 L BNN\r\n' + 
+'F 2 "GND" H 5800 4650 60  0000 C CNN\r\n' + 
+'F 3 "" H 5800 4650 60  0000 C CNN\r\n' + 
+'	1    5800 4650\r\n' + 
+'	1    0    0    -1  \r\n' + 
+'$EndComp\r\n' + 
+'$Comp\r\n' + 
+'L +3.3V #PWR15\r\n' + 
+'U 1 1 520EEFF4\r\n' + 
+'P 5650 5850\r\n' + 
+'F 0 "#PWR15" V 5650 5850 50  0001 L BNN\r\n' + 
+'F 1 "+3.3V" V 5700 5850 30  0000 L BNN\r\n' + 
+'F 2 "" H 5650 5850 60  0000 C CNN\r\n' + 
+'F 3 "" H 5650 5850 60  0000 C CNN\r\n' + 
+'	1    5650 5850\r\n' + 
+'	1    0    0    -1  \r\n' + 
+'$EndComp\r\n' + 
+'$Comp\r\n' + 
+'L GND #PWR9\r\n' + 
+'U 1 1 520EF003\r\n' + 
+'P 3850 4700\r\n' + 
+'F 0 "#PWR9" H 3850 4700 30  0001 L BNN\r\n' + 
+'F 1 "GND" H 3802 4620 30  0000 L BNN\r\n' + 
+'F 2 "GND" H 3850 4700 60  0000 C CNN\r\n' + 
+'F 3 "" H 3850 4700 60  0000 C CNN\r\n' + 
+'	1    3850 4700\r\n' + 
+'	1    0    0    -1  \r\n' + 
+'$EndComp\r\n' + 
+'$Comp\r\n' + 
+'L GND #PWR25\r\n' + 
+'U 1 1 520EF04E\r\n' + 
+'P 6650 3600\r\n' + 
+'F 0 "#PWR25" H 6650 3600 30  0001 L BNN\r\n' + 
+'F 1 "GND" H 6602 3520 30  0000 L BNN\r\n' + 
+'F 2 "GND" H 6650 3600 60  0000 C CNN\r\n' + 
+'F 3 "" H 6650 3600 60  0000 C CNN\r\n' + 
+'	1    6650 3600\r\n' + 
+'	1    0    0    -1  \r\n' + 
+'$EndComp\r\n' + 
+'$Comp\r\n' + 
+'L +3.3V #PWR8\r\n' + 
+'U 1 1 520EF56D\r\n' + 
+'P 3800 2800\r\n' + 
+'F 0 "#PWR8" V 3800 2800 50  0001 L BNN\r\n' + 
+'F 1 "+3.3V" V 3850 2800 30  0000 L BNN\r\n' + 
+'F 2 "" H 3800 2800 60  0000 C CNN\r\n' + 
+'F 3 "" H 3800 2800 60  0000 C CNN\r\n' + 
+'	1    3800 2800\r\n' + 
+'	1    0    0    -1  \r\n' + 
+'$EndComp\r\n' + 
+'$Comp\r\n' + 
+'L GND #PWR5\r\n' + 
+'U 1 1 520EF57C\r\n' + 
+'P 3400 2600\r\n' + 
+'F 0 "#PWR5" H 3400 2600 30  0001 L BNN\r\n' + 
+'F 1 "GND" H 3352 2520 30  0000 L BNN\r\n' + 
+'F 2 "GND" H 3400 2600 60  0000 C CNN\r\n' + 
+'F 3 "" H 3400 2600 60  0000 C CNN\r\n' + 
+'	1    3400 2600\r\n' + 
+'	1    0    0    -1  \r\n' + 
+'$EndComp\r\n' + 
+'$Comp\r\n' + 
+'L +3.3V #PWR4\r\n' + 
+'U 1 1 520EF58B\r\n' + 
+'P 3150 2150\r\n' + 
+'F 0 "#PWR4" V 3150 2150 50  0001 L BNN\r\n' + 
+'F 1 "+3.3V" V 3200 2150 30  0000 L BNN\r\n' + 
+'F 2 "" H 3150 2150 60  0000 C CNN\r\n' + 
+'F 3 "" H 3150 2150 60  0000 C CNN\r\n' + 
+'	1    3150 2150\r\n' + 
+'	1    0    0    -1  \r\n' + 
+'$EndComp\r\n' + 
+'$Comp\r\n' + 
+'L GND #PWR7\r\n' + 
+'U 1 1 520EF627\r\n' + 
+'P 3700 1150\r\n' + 
+'F 0 "#PWR7" H 3700 1150 30  0001 L BNN\r\n' + 
+'F 1 "GND" H 3652 1070 30  0000 L BNN\r\n' + 
+'F 2 "GND" H 3700 1150 60  0000 C CNN\r\n' + 
+'F 3 "" H 3700 1150 60  0000 C CNN\r\n' + 
+'	1    3700 1150\r\n' + 
+'	1    0    0    -1  \r\n' + 
+'$EndComp\r\n' + 
+'$Comp\r\n' + 
+'L GND #PWR40\r\n' + 
+'U 1 1 520EF47C\r\n' + 
+'P 10150 4700\r\n' + 
+'F 0 "#PWR40" H 10150 4700 30  0001 L BNN\r\n' + 
+'F 1 "GND" H 10102 4620 30  0000 L BNN\r\n' + 
+'F 2 "GND" H 10150 4700 60  0000 C CNN\r\n' + 
+'F 3 "" H 10150 4700 60  0000 C CNN\r\n' + 
+'	1    10150 4700\r\n' + 
+'	1    0    0    -1  \r\n' + 
+'$EndComp\r\n' + 
+'$Comp\r\n' + 
+'L +3.3V #PWR47\r\n' + 
+'U 1 1 520EF48B\r\n' + 
+'P 10850 4450\r\n' + 
+'F 0 "#PWR47" V 10850 4450 50  0001 L BNN\r\n' + 
+'F 1 "+3.3V" V 10900 4450 30  0000 L BNN\r\n' + 
+'F 2 "" H 10850 4450 60  0000 C CNN\r\n' + 
+'F 3 "" H 10850 4450 60  0000 C CNN\r\n' + 
+'	1    10850 4450\r\n' + 
+'	1    0    0    -1  \r\n' + 
+'$EndComp\r\n' + 
+'$Comp\r\n' + 
+'L LED_B L1\r\n' + 
+'U 1 1 520F1612\r\n' + 
+'P 10550 4350\r\n' + 
+'F 0 "L1" V 10600 4250 30  0000 L BNN\r\n' + 
+'F 1 "LED_B" V 10540 4356 30  0001 L BNN\r\n' + 
+'F 2 "" H 10550 4350 60  0000 C CNN\r\n' + 
+'F 3 "" H 10550 4350 60  0000 C CNN\r\n' + 
+'	1    10550 4350\r\n' + 
+'	0    1    1    0   \r\n' + 
+'$EndComp\r\n' + 
+'$Comp\r\n' + 
+'L +3.3V #PWR16\r\n' + 
+'U 1 1 520F1641\r\n' + 
+'P 5800 4400\r\n' + 
+'F 0 "#PWR16" V 5800 4400 50  0001 L BNN\r\n' + 
+'F 1 "+3.3V" V 5850 4400 30  0000 L BNN\r\n' + 
+'F 2 "" H 5800 4400 60  0000 C CNN\r\n' + 
+'F 3 "" H 5800 4400 60  0000 C CNN\r\n' + 
+'	1    5800 4400\r\n' + 
+'	1    0    0    -1  \r\n' + 
+'$EndComp\r\n' + 
+'$Comp\r\n' + 
+'L +3.3V #PWR18\r\n' + 
+'U 1 1 520F92F8\r\n' + 
+'P 5850 3350\r\n' + 
+'F 0 "#PWR18" V 5850 3350 50  0001 L BNN\r\n' + 
+'F 1 "+3.3V" V 5900 3350 30  0000 L BNN\r\n' + 
+'F 2 "" H 5850 3350 60  0000 C CNN\r\n' + 
+'F 3 "" H 5850 3350 60  0000 C CNN\r\n' + 
+'	1    5850 3350\r\n' + 
+'	1    0    0    -1  \r\n' + 
+'$EndComp\r\n' + 
+'$Comp\r\n' + 
+'L FERRITE FB2\r\n' + 
+'U 1 1 520F94A4\r\n' + 
+'P 6700 3000\r\n' + 
+'F 0 "FB2" H 6800 3050 30  0000 R TNN\r\n' + 
+'F 1 "FERRITE" H 6700 3050 30  0000 R TNN\r\n' + 
+'F 2 "dan-rcl-0402" H 6700 3150 50  0001 C CNN\r\n' + 
+'F 3 "" H 6700 3000 60  0000 C CNN\r\n' + 
+'	1    6700 3000\r\n' + 
+'	1    0    0    -1  \r\n' + 
+'$EndComp\r\n' + 
+'$Comp\r\n' + 
+'L FERRITE FB1\r\n' + 
+'U 1 1 520F94B8\r\n' + 
+'P 5850 3500\r\n' + 
+'F 0 "FB1" H 5950 3550 30  0000 R TNN\r\n' + 
+'F 1 "FERRITE" H 5850 3550 30  0000 R TNN\r\n' + 
+'F 2 "dan-rcl-0402" H 5850 3650 50  0001 C CNN\r\n' + 
+'F 3 "" H 5850 3500 60  0000 C CNN\r\n' + 
+'	1    5850 3500\r\n' + 
+'	0    -1   -1   0   \r\n' + 
+'$EndComp\r\n' + 
+'NoConn ~ 6300 5850\r\n' + 
+'NoConn ~ 6000 5850\r\n' + 
+'NoConn ~ 5450 3750\r\n' + 
+'NoConn ~ 5450 3800\r\n' + 
+'$Comp\r\n' + 
+'L C_CPOL C14\r\n' + 
+'U 1 1 52119207\r\n' + 
+'P 6300 3350\r\n' + 
+'F 0 "C14" V 6275 3375 30  0000 C CNN\r\n' + 
+'F 1 "10uF" V 6275 3225 30  0000 C CNN\r\n' + 
+'F 2 "" H 6300 3350 30  0001 C CNN\r\n' + 
+'F 3 "" H 6300 3350 30  0001 C CNN\r\n' + 
+'	1    6300 3350\r\n' + 
+'	1    0    0    -1  \r\n' + 
+'$EndComp\r\n' + 
+'$Comp\r\n' + 
+'L BEAD B1\r\n' + 
+'U 1 1 5211703C\r\n' + 
+'P 6150 3250\r\n' + 
+'F 0 "B1" V 6250 3250 60  0000 C CNN\r\n' + 
+'F 1 "10uh" V 6100 3300 60  0000 C CNN\r\n' + 
+'F 2 "" H 6150 3250 60  0000 C CNN\r\n' + 
+'F 3 "" H 6150 3250 60  0000 C CNN\r\n' + 
+'F 4 "LFR1608T100M-LR" H 6150 3250 60  0001 C CNN "Part"\r\n' + 
+'	1    6150 3250\r\n' + 
+'	0    -1   -1   0   \r\n' + 
+'$EndComp\r\n' + 
+'$Comp\r\n' + 
+'L C_CPOL C21\r\n' + 
+'U 1 1 5212BE4B\r\n' + 
+'P 6900 3050\r\n' + 
+'F 0 "C21" H 6800 3000 30  0000 C CNN\r\n' + 
+'F 1 "10uF" H 6800 2950 30  0000 C CNN\r\n' + 
+'F 2 "" H 6900 3050 30  0001 C CNN\r\n' + 
+'F 3 "" H 6900 3050 30  0001 C CNN\r\n' + 
+'	1    6900 3050\r\n' + 
+'	1    0    0    -1  \r\n' + 
+'$EndComp\r\n' + 
+'$Comp\r\n' + 
+'L C_C C23\r\n' + 
+'U 1 1 5212BE51\r\n' + 
+'P 7550 3300\r\n' + 
+'F 0 "C23" V 7525 3325 30  0000 C CNN\r\n' + 
+'F 1 "100nF" V 7525 3175 30  0000 C CNN\r\n' + 
+'F 2 "" H 7550 3300 30  0001 C CNN\r\n' + 
+'F 3 "" H 7550 3300 30  0001 C CNN\r\n' + 
+'	1    7550 3300\r\n' + 
+'	0    -1   -1   0   \r\n' + 
+'$EndComp\r\n' + 
+'$Comp\r\n' + 
+'L +3.3V #PWR20\r\n' + 
+'U 1 1 5212E24F\r\n' + 
+'P 6000 3200\r\n' + 
+'F 0 "#PWR20" V 6000 3200 50  0001 L BNN\r\n' + 
+'F 1 "+3.3V" V 6050 3200 30  0000 L BNN\r\n' + 
+'F 2 "" H 6000 3200 60  0000 C CNN\r\n' + 
+'F 3 "" H 6000 3200 60  0000 C CNN\r\n' + 
+'	1    6000 3200\r\n' + 
+'	1    0    0    -1  \r\n' + 
+'$EndComp\r\n' + 
+'$Comp\r\n' + 
+'L GND #PWR27\r\n' + 
+'U 1 1 5212E25E\r\n' + 
+'P 6900 3200\r\n' + 
+'F 0 "#PWR27" H 6900 3200 30  0001 L BNN\r\n' + 
+'F 1 "GND" H 6850 3100 30  0000 L BNN\r\n' + 
+'F 2 "GND" H 6900 3200 60  0000 C CNN\r\n' + 
+'F 3 "" H 6900 3200 60  0000 C CNN\r\n' + 
+'	1    6900 3200\r\n' + 
+'	1    0    0    -1  \r\n' + 
+'$EndComp\r\n' + 
+'$Comp\r\n' + 
+'L GND #PWR31\r\n' + 
+'U 1 1 5212E26D\r\n' + 
+'P 7750 3350\r\n' + 
+'F 0 "#PWR31" H 7750 3350 30  0001 L BNN\r\n' + 
+'F 1 "GND" H 7702 3270 30  0000 L BNN\r\n' + 
+'F 2 "GND" H 7750 3350 60  0000 C CNN\r\n' + 
+'F 3 "" H 7750 3350 60  0000 C CNN\r\n' + 
+'	1    7750 3350\r\n' + 
+'	1    0    0    -1  \r\n' + 
+'$EndComp\r\n' + 
+'NoConn ~ 7950 3600\r\n' + 
+'NoConn ~ 8000 3600\r\n' + 
+'$Comp\r\n' + 
+'L R_R R7\r\n' + 
+'U 1 1 520F18D5\r\n' + 
+'P 5850 1000\r\n' + 
+'F 0 "R7" H 5800 950 30  0000 C CNN\r\n' + 
+'F 1 "100R" H 5800 1050 30  0000 C CNN\r\n' + 
+'F 2 "" H 5850 1000 30  0001 C CNN\r\n' + 
+'F 3 "" H 5850 1000 30  0001 C CNN\r\n' + 
+'	1    5850 1000\r\n' + 
+'	1    0    0    -1  \r\n' + 
+'$EndComp\r\n' + 
+'$Comp\r\n' + 
+'L GSB311231HR U1\r\n' + 
+'U 1 1 52E87570\r\n' + 
+'P 4900 1550\r\n' + 
+'F 0 "U1" H 4580 2766 50  0000 L BNN\r\n' + 
+'F 1 "GSB311231HR" H 4580 270 50  0000 L BNN\r\n' + 
+'F 2 "USB Stacked" H 4900 1700 50  0001 C CNN\r\n' + 
+'F 3 "" H 4900 1550 60  0000 C CNN\r\n' + 
+'	1    4900 1550\r\n' + 
+'	1    0    0    -1  \r\n' + 
+'$EndComp\r\n' + 
+'$Comp\r\n' + 
+'L +5V #PWR14\r\n' + 
+'U 1 1 52E89494\r\n' + 
+'P 5350 1300\r\n' + 
+'F 0 "#PWR14" V 5350 1300 50  0001 L BNN\r\n' + 
+'F 1 "+5V" V 5400 1300 30  0000 L BNN\r\n' + 
+'F 2 "" H 5350 1300 60  0000 C CNN\r\n' + 
+'F 3 "" H 5350 1300 60  0000 C CNN\r\n' + 
+'	1    5350 1300\r\n' + 
+'	1    0    0    -1  \r\n' + 
+'$EndComp\r\n' + 
+'$Comp\r\n' + 
+'L JP_JP1Q JP2\r\n' + 
+'U 1 1 52E896DC\r\n' + 
+'P 5750 1400\r\n' + 
+'F 0 "JP2" V 5664 1272 50  0000 L BNN\r\n' + 
+'F 1 "JP_JP1Q" V 5840 1272 50  0000 L BNN\r\n' + 
+'F 2 "jumper-JP1" H 5750 1550 50  0001 C CNN\r\n' + 
+'F 3 "" H 5750 1400 60  0000 C CNN\r\n' + 
+'	1    5750 1400\r\n' + 
+'	1    0    0    -1  \r\n' + 
+'$EndComp\r\n' + 
+'$Comp\r\n' + 
+'L IC_SN74LVC1T45 IC5\r\n' + 
+'U 1 1 52E8AB14\r\n' + 
+'P 6950 1300\r\n' + 
+'F 0 "IC5" H 6750 1400 30  0000 C CNN\r\n' + 
+'F 1 "SN74LVC1T45DCKR" H 7100 1150 30  0000 C CNN\r\n' + 
+'F 2 "" H 6950 1300 30  0001 C CNN\r\n' + 
+'F 3 "" H 6950 1300 30  0001 C CNN\r\n' + 
+'	1    6950 1300\r\n' + 
+'	-1   0    0    1   \r\n' + 
+'$EndComp\r\n' + 
+'$Comp\r\n' + 
+'L R_R R22\r\n' + 
+'U 1 1 52E8DA66\r\n' + 
+'P 6150 1200\r\n' + 
+'F 0 "R22" H 6200 1200 30  0000 C CNN\r\n' + 
+'F 1 "10K" H 6050 1200 30  0000 C CNN\r\n' + 
+'F 2 "" H 6150 1200 30  0001 C CNN\r\n' + 
+'F 3 "" H 6150 1200 30  0001 C CNN\r\n' + 
+'	1    6150 1200\r\n' + 
+'	1    0    0    -1  \r\n' + 
+'$EndComp\r\n' + 
+'$Comp\r\n' + 
+'L R_R R21\r\n' + 
+'U 1 1 52E8DEF3\r\n' + 
+'P 5850 1250\r\n' + 
+'F 0 "R21" H 5800 1200 30  0000 C CNN\r\n' + 
+'F 1 "100R" H 5800 1300 30  0000 C CNN\r\n' + 
+'F 2 "" H 5850 1250 30  0001 C CNN\r\n' + 
+'F 3 "" H 5850 1250 30  0001 C CNN\r\n' + 
+'	1    5850 1250\r\n' + 
+'	1    0    0    -1  \r\n' + 
+'$EndComp\r\n' + 
+'$Comp\r\n' + 
+'L R_R R23\r\n' + 
+'U 1 1 52E9706D\r\n' + 
+'P 7650 750\r\n' + 
+'F 0 "R23" H 7700 750 30  0000 C CNN\r\n' + 
+'F 1 "1K" H 7550 750 30  0000 C CNN\r\n' + 
+'F 2 "" H 7650 750 30  0001 C CNN\r\n' + 
+'F 3 "" H 7650 750 30  0001 C CNN\r\n' + 
+'	1    7650 750 \r\n' + 
+'	1    0    0    -1  \r\n' + 
+'$EndComp\r\n' + 
+'$Comp\r\n' + 
+'L D_D-ZENER D2\r\n' + 
+'U 1 1 52F1012C\r\n' + 
+'P 2300 1000\r\n' + 
+'F 0 "D2" H 2300 950 30  0000 C CNN\r\n' + 
+'F 1 "SMAJ5.0A" H 2300 1050 30  0000 C CNN\r\n' + 
+'F 2 "" H 2300 1000 30  0001 C CNN\r\n' + 
+'F 3 "" H 2300 1000 30  0001 C CNN\r\n' + 
+'	1    2300 1000\r\n' + 
+'	0    1    1    0   \r\n' + 
+'$EndComp\r\n' + 
+'$Comp\r\n' + 
+'L R_R R18\r\n' + 
+'U 1 1 52F482F6\r\n' + 
+'P 2200 550\r\n' + 
+'F 0 "R18" H 2200 600 30  0000 C CNN\r\n' + 
+'F 1 "1K" H 2200 500 30  0000 C CNN\r\n' + 
+'F 2 "" H 2200 550 30  0001 C CNN\r\n' + 
+'F 3 "" H 2200 550 30  0001 C CNN\r\n' + 
+'	1    2200 550 \r\n' + 
+'	1    0    0    -1  \r\n' + 
+'$EndComp\r\n' + 
+'$Comp\r\n' + 
+'L 2N2907A-PNP-TO18-EBC T2\r\n' + 
+'U 1 1 52F70F9A\r\n' + 
+'P 2500 650\r\n' + 
+'F 0 "T2" H 2400 700 50  0000 L BNN\r\n' + 
+'F 1 "2N2907A" H 2400 550 50  0000 L BNN\r\n' + 
+'F 2 "transistor-TO18" H 2500 800 50  0001 C CNN\r\n' + 
+'F 3 "" H 2500 650 60  0000 C CNN\r\n' + 
+'	1    2500 650 \r\n' + 
+'	0    1    1    0   \r\n' + 
+'$EndComp\r\n' + 
+'$Comp\r\n' + 
+'L GND #PWR1\r\n' + 
+'U 1 1 52F71BCA\r\n' + 
+'P 1600 1200\r\n' + 
+'F 0 "#PWR1" H 1600 1200 30  0001 L BNN\r\n' + 
+'F 1 "GND" H 1552 1120 30  0000 L BNN\r\n' + 
+'F 2 "GND" H 1600 1200 60  0000 C CNN\r\n' + 
+'F 3 "" H 1600 1200 60  0000 C CNN\r\n' + 
+'	1    1600 1200\r\n' + 
+'	1    0    0    -1  \r\n' + 
+'$EndComp\r\n' + 
+'$Comp\r\n' + 
+'L R_R R17\r\n' + 
+'U 1 1 52F71BD0\r\n' + 
+'P 1700 1050\r\n' + 
+'F 0 "R17" H 1650 1000 30  0000 C CNN\r\n' + 
+'F 1 "22K" H 1650 1100 30  0000 C CNN\r\n' + 
+'F 2 "" H 1700 1050 30  0001 C CNN\r\n' + 
+'F 3 "" H 1700 1050 30  0001 C CNN\r\n' + 
+'	1    1700 1050\r\n' + 
+'	0    -1   -1   0   \r\n' + 
+'$EndComp\r\n' + 
+'$Comp\r\n' + 
+'L R_R R10\r\n' + 
+'U 1 1 52F71E2E\r\n' + 
+'P 1600 950\r\n' + 
+'F 0 "R10" H 1600 900 30  0000 C CNN\r\n' + 
+'F 1 "2.2K" H 1600 1000 30  0000 C CNN\r\n' + 
+'F 2 "" H 1600 950 30  0001 C CNN\r\n' + 
+'F 3 "" H 1600 950 30  0001 C CNN\r\n' + 
+'	1    1600 950 \r\n' + 
+'	-1   0    0    1   \r\n' + 
+'$EndComp\r\n' + 
+'$Comp\r\n' + 
+'L R_R R20\r\n' + 
+'U 1 1 52F722E6\r\n' + 
+'P 2700 650\r\n' + 
+'F 0 "R20" H 2700 700 30  0000 C CNN\r\n' + 
+'F 1 "10k" H 2700 600 30  0000 C CNN\r\n' + 
+'F 2 "" H 2700 650 30  0001 C CNN\r\n' + 
+'F 3 "" H 2700 650 30  0001 C CNN\r\n' + 
+'	1    2700 650 \r\n' + 
+'	0    -1   -1   0   \r\n' + 
+'$EndComp\r\n' + 
+'$Comp\r\n' + 
+'L USB_MOLEX-47346-0001 USB1\r\n' + 
+'U 1 1 52F9742F\r\n' + 
+'P 10450 5800\r\n' + 
+'F 0 "USB1" V 10386 6088 50  0000 L BNN\r\n' + 
+'F 1 "USB_MOLEX-47346-0001" H 10684 5608 50  0000 L BNN\r\n' + 
+'F 2 "usb_con-update-MOLEX-47364-0001" H 10450 5950 50  0001 C CNN\r\n' + 
+'F 3 "" H 10450 5800 60  0000 C CNN\r\n' + 
+'	1    10450 5800\r\n' + 
+'	1    0    0    -1  \r\n' + 
+'$EndComp\r\n' + 
+'$Comp\r\n' + 
+'L C_C C31\r\n' + 
+'U 1 1 52F97A08\r\n' + 
+'P 10200 6300\r\n' + 
+'F 0 "C31" V 10200 6300 30  0000 C CNN\r\n' + 
+'F 1 "4.7nf" V 10130 6270 30  0000 C CNN\r\n' + 
+'F 2 "" H 10200 6300 30  0001 C CNN\r\n' + 
+'F 3 "" H 10200 6300 30  0001 C CNN\r\n' + 
+'	1    10200 6300\r\n' + 
+'	0    1    1    0   \r\n' + 
+'$EndComp\r\n' + 
+'$Comp\r\n' + 
+'L R_R R24\r\n' + 
+'U 1 1 52F97A1D\r\n' + 
+'P 10200 6150\r\n' + 
+'F 0 "R24" H 10350 6200 30  0000 C CNN\r\n' + 
+'F 1 "1M" H 10200 6200 30  0000 C CNN\r\n' + 
+'F 2 "" H 10200 6150 30  0001 C CNN\r\n' + 
+'F 3 "" H 10200 6150 30  0001 C CNN\r\n' + 
+'	1    10200 6150\r\n' + 
+'	1    0    0    -1  \r\n' + 
+'$EndComp\r\n' + 
+'$Comp\r\n' + 
+'L GND #PWR41\r\n' + 
+'U 1 1 52F985E5\r\n' + 
+'P 10300 6400\r\n' + 
+'F 0 "#PWR41" H 10300 6400 30  0001 L BNN\r\n' + 
+'F 1 "GND" H 10252 6320 30  0000 L BNN\r\n' + 
+'F 2 "GND" H 10300 6400 60  0000 C CNN\r\n' + 
+'F 3 "" H 10300 6400 60  0000 C CNN\r\n' + 
+'	1    10300 6400\r\n' + 
+'	1    0    0    -1  \r\n' + 
+'$EndComp\r\n' + 
+'$Comp\r\n' + 
+'L D_D-ZENER D3\r\n' + 
+'U 1 1 52F991C9\r\n' + 
+'P 8400 6200\r\n' + 
+'F 0 "D3" H 8400 6150 30  0000 C CNN\r\n' + 
+'F 1 "SMAJ5.0A" H 8400 6250 30  0000 C CNN\r\n' + 
+'F 2 "" H 8400 6200 30  0001 C CNN\r\n' + 
+'F 3 "" H 8400 6200 30  0001 C CNN\r\n' + 
+'	1    8400 6200\r\n' + 
+'	0    -1   -1   0   \r\n' + 
+'$EndComp\r\n' + 
+'$Comp\r\n' + 
+'L +5V #PWR32\r\n' + 
+'U 1 1 52F996AF\r\n' + 
+'P 8400 6100\r\n' + 
+'F 0 "#PWR32" V 8400 6100 50  0001 L BNN\r\n' + 
+'F 1 "+5V" V 8450 6100 30  0000 L BNN\r\n' + 
+'F 2 "" H 8400 6100 60  0000 C CNN\r\n' + 
+'F 3 "" H 8400 6100 60  0000 C CNN\r\n' + 
+'	1    8400 6100\r\n' + 
+'	1    0    0    -1  \r\n' + 
+'$EndComp\r\n' + 
+'$Comp\r\n' + 
+'L C_C C30\r\n' + 
+'U 1 1 520F18F0\r\n' + 
+'P 6000 2000\r\n' + 
+'F 0 "C30" V 6050 1850 30  0000 C CNN\r\n' + 
+'F 1 "4.7nf" V 6050 2050 30  0000 C CNN\r\n' + 
+'F 2 "" H 6000 2000 30  0001 C CNN\r\n' + 
+'F 3 "" H 6000 2000 30  0001 C CNN\r\n' + 
+'	1    6000 2000\r\n' + 
+'	0    -1   -1   0   \r\n' + 
+'$EndComp\r\n' + 
+'$Comp\r\n' + 
+'L MAX3207E U3\r\n' + 
+'U 1 1 52FB9656\r\n' + 
+'P 9500 6250\r\n' + 
+'F 0 "U3" H 9350 6550 60  0000 C CNN\r\n' + 
+'F 1 "MAX3207E" H 9500 6650 60  0000 C CNN\r\n' + 
+'F 2 "" H 9500 6250 60  0000 C CNN\r\n' + 
+'F 3 "" H 9500 6250 60  0000 C CNN\r\n' + 
+'	1    9500 6250\r\n' + 
+'	-1   0    0    1   \r\n' + 
+'$EndComp\r\n' + 
+'$Comp\r\n' + 
+'L JP_JP1Q JP6\r\n' + 
+'U 1 1 52FBE240\r\n' + 
+'P 8550 6250\r\n' + 
+'F 0 "JP6" V 8464 6122 50  0000 L BNN\r\n' + 
+'F 1 "JP_JP1Q" V 8640 6122 50  0000 L BNN\r\n' + 
+'F 2 "jumper-JP1" H 8550 6400 50  0001 C CNN\r\n' + 
+'F 3 "" H 8550 6250 60  0000 C CNN\r\n' + 
+'	1    8550 6250\r\n' + 
+'	0    -1   -1   0   \r\n' + 
+'$EndComp\r\n' + 
+'$Comp\r\n' + 
+'L R_R R19\r\n' + 
+'U 1 1 530D4BDC\r\n' + 
+'P 2200 1550\r\n' + 
+'F 0 "R19" H 2150 1500 30  0000 C CNN\r\n' + 
+'F 1 "100K" H 2150 1600 30  0000 C CNN\r\n' + 
+'F 2 "" H 2200 1550 30  0001 C CNN\r\n' + 
+'F 3 "" H 2200 1550 30  0001 C CNN\r\n' + 
+'	1    2200 1550\r\n' + 
+'	0    -1   -1   0   \r\n' + 
+'$EndComp\r\n' + 
+'$Comp\r\n' + 
+'L GND #PWR2\r\n' + 
+'U 1 1 530D4BE7\r\n' + 
+'P 2200 1700\r\n' + 
+'F 0 "#PWR2" H 2200 1700 30  0001 L BNN\r\n' + 
+'F 1 "GND" H 2152 1620 30  0000 L BNN\r\n' + 
+'F 2 "GND" H 2200 1700 60  0000 C CNN\r\n' + 
+'F 3 "" H 2200 1700 60  0000 C CNN\r\n' + 
+'	1    2200 1700\r\n' + 
+'	1    0    0    -1  \r\n' + 
+'$EndComp\r\n' + 
+'NoConn ~ 9100 6450\r\n' + 
+'NoConn ~ 9900 6050\r\n' + 
+'$Comp\r\n' + 
+'L GND #PWR10\r\n' + 
+'U 1 1 530DA602\r\n' + 
+'P 4050 1550\r\n' + 
+'F 0 "#PWR10" H 4050 1550 30  0001 L BNN\r\n' + 
+'F 1 "GND" H 4002 1470 30  0000 L BNN\r\n' + 
+'F 2 "GND" H 4050 1550 60  0000 C CNN\r\n' + 
+'F 3 "" H 4050 1550 60  0000 C CNN\r\n' + 
+'	1    4050 1550\r\n' + 
+'	1    0    0    -1  \r\n' + 
+'$EndComp\r\n' + 
+'NoConn ~ 10425 6050\r\n' + 
+'NoConn ~ 10475 6050\r\n' + 
+'NoConn ~ 10525 6050\r\n' + 
+'NoConn ~ 10575 6050\r\n' + 
+'NoConn ~ 4500 1650\r\n' + 
+'$Comp\r\n' + 
+'L R_R R25\r\n' + 
+'U 1 1 531001A0\r\n' + 
+'P 7200 5800\r\n' + 
+'F 0 "R25" H 7200 5850 30  0000 C CNN\r\n' + 
+'F 1 "10k" H 7200 5750 30  0000 C CNN\r\n' + 
+'F 2 "" H 7200 5800 30  0001 C CNN\r\n' + 
+'F 3 "" H 7200 5800 30  0001 C CNN\r\n' + 
+'	1    7200 5800\r\n' + 
+'	1    0    0    -1  \r\n' + 
+'$EndComp\r\n' + 
+'$Comp\r\n' + 
+'L +3.3V #PWR29\r\n' + 
+'U 1 1 531001A6\r\n' + 
+'P 7300 5700\r\n' + 
+'F 0 "#PWR29" V 7300 5700 50  0001 L BNN\r\n' + 
+'F 1 "+3.3V" V 7350 5700 30  0000 L BNN\r\n' + 
+'F 2 "" H 7300 5700 60  0000 C CNN\r\n' + 
+'F 3 "" H 7300 5700 60  0000 C CNN\r\n' + 
+'	1    7300 5700\r\n' + 
+'	1    0    0    -1  \r\n' + 
+'$EndComp\r\n' + 
+'$Comp\r\n' + 
+'L GND #PWR28\r\n' + 
+'U 1 1 53100C2C\r\n' + 
+'P 7050 6250\r\n' + 
+'F 0 "#PWR28" H 7050 6250 30  0001 L BNN\r\n' + 
+'F 1 "GND" H 7002 6170 30  0000 L BNN\r\n' + 
+'F 2 "GND" H 7050 6250 60  0000 C CNN\r\n' + 
+'F 3 "" H 7050 6250 60  0000 C CNN\r\n' + 
+'	1    7050 6250\r\n' + 
+'	1    0    0    -1  \r\n' + 
+'$EndComp\r\n' + 
+'$Comp\r\n' + 
+'L -NPN-TO92 T1\r\n' + 
+'U 1 1 5317C13D\r\n' + 
+'P 1900 1050\r\n' + 
+'F 0 "T1" V 1850 1100 50  0000 L BNN\r\n' + 
+'F 1 "2n2222a" V 1750 900 50  0000 L BNN\r\n' + 
+'F 2 "transistor-TO92" H 1900 1200 50  0001 C CNN\r\n' + 
+'F 3 "" H 1900 1050 60  0000 C CNN\r\n' + 
+'	1    1900 1050\r\n' + 
+'	0    1    1    0   \r\n' + 
+'$EndComp\r\n' + 
+'$Comp\r\n' + 
+'L MPU-9250 U4\r\n' + 
+'U 1 1 531B2B8E\r\n' + 
+'P 10200 1500\r\n' + 
+'F 0 "U4" H 9900 1950 60  0000 C CNN\r\n' + 
+'F 1 "MPU-9250" H 10200 1550 60  0000 C CNN\r\n' + 
+'F 2 "" H 10200 1500 60  0000 C CNN\r\n' + 
+'F 3 "" H 10200 1500 60  0000 C CNN\r\n' + 
+'	1    10200 1500\r\n' + 
+'	1    0    0    -1  \r\n' + 
+'$EndComp\r\n' + 
+'$Comp\r\n' + 
+'L C_C C27\r\n' + 
+'U 1 1 531B2D88\r\n' + 
+'P 9600 1300\r\n' + 
+'F 0 "C27" V 9600 1300 30  0000 C CNN\r\n' + 
+'F 1 "10nf" V 9530 1270 30  0000 C CNN\r\n' + 
+'F 2 "" H 9600 1300 30  0001 C CNN\r\n' + 
+'F 3 "" H 9600 1300 30  0001 C CNN\r\n' + 
+'	1    9600 1300\r\n' + 
+'	1    0    0    -1  \r\n' + 
+'$EndComp\r\n' + 
+'$Comp\r\n' + 
+'L C_C C28\r\n' + 
+'U 1 1 531B34B4\r\n' + 
+'P 10850 1750\r\n' + 
+'F 0 "C28" V 10850 1750 30  0000 C CNN\r\n' + 
+'F 1 ".1uf" V 10780 1710 30  0000 C CNN\r\n' + 
+'F 2 "" H 10850 1750 30  0001 C CNN\r\n' + 
+'F 3 "" H 10850 1750 30  0001 C CNN\r\n' + 
+'	1    10850 1750\r\n' + 
+'	0    1    1    0   \r\n' + 
+'$EndComp\r\n' + 
+'$Comp\r\n' + 
+'L GND #PWR48\r\n' + 
+'U 1 1 531B42E0\r\n' + 
+'P 10900 2000\r\n' + 
+'F 0 "#PWR48" H 10900 2000 30  0001 L BNN\r\n' + 
+'F 1 "GND" H 10852 1920 30  0000 L BNN\r\n' + 
+'F 2 "GND" H 10900 2000 60  0000 C CNN\r\n' + 
+'F 3 "" H 10900 2000 60  0000 C CNN\r\n' + 
+'	1    10900 2000\r\n' + 
+'	1    0    0    -1  \r\n' + 
+'$EndComp\r\n' + 
+'$Comp\r\n' + 
+'L +3.3V #PWR34\r\n' + 
+'U 1 1 531B42F0\r\n' + 
+'P 9600 1100\r\n' + 
+'F 0 "#PWR34" V 9600 1100 50  0001 L BNN\r\n' + 
+'F 1 "+3.3V" V 9650 1100 30  0000 L BNN\r\n' + 
+'F 2 "" H 9600 1100 60  0000 C CNN\r\n' + 
+'F 3 "" H 9600 1100 60  0000 C CNN\r\n' + 
+'	1    9600 1100\r\n' + 
+'	1    0    0    -1  \r\n' + 
+'$EndComp\r\n' + 
+'$Comp\r\n' + 
+'L GND #PWR35\r\n' + 
+'U 1 1 531B4802\r\n' + 
+'P 9600 1400\r\n' + 
+'F 0 "#PWR35" H 9600 1400 30  0001 L BNN\r\n' + 
+'F 1 "GND" H 9552 1320 30  0000 L BNN\r\n' + 
+'F 2 "GND" H 9600 1400 60  0000 C CNN\r\n' + 
+'F 3 "" H 9600 1400 60  0000 C CNN\r\n' + 
+'	1    9600 1400\r\n' + 
+'	1    0    0    -1  \r\n' + 
+'$EndComp\r\n' + 
+'$Comp\r\n' + 
+'L C_C C26\r\n' + 
+'U 1 1 531B4812\r\n' + 
+'P 9450 1200\r\n' + 
+'F 0 "C26" V 9450 1200 30  0000 C CNN\r\n' + 
+'F 1 ".1uf" V 9380 1160 30  0000 C CNN\r\n' + 
+'F 2 "" H 9450 1200 30  0001 C CNN\r\n' + 
+'F 3 "" H 9450 1200 30  0001 C CNN\r\n' + 
+'	1    9450 1200\r\n' + 
+'	1    0    0    -1  \r\n' + 
+'$EndComp\r\n' + 
+'$Comp\r\n' + 
+'L U_ATXMEGA256A3 U2\r\n' + 
+'U 1 1 520F18C7\r\n' + 
+'P 8050 3950\r\n' + 
+'F 0 "U2" H 7800 4900 30  0000 C CNN\r\n' + 
+'F 1 "ATXMEGA256A3-AU" H 8050 3000 30  0000 C CNN\r\n' + 
+'F 2 "" H 8050 3950 30  0001 C CNN\r\n' + 
+'F 3 "" H 8050 3950 30  0001 C CNN\r\n' + 
+'	1    8050 3950\r\n' + 
+'	0    -1   1    0   \r\n' + 
+'$EndComp\r\n' + 
+'$Comp\r\n' + 
+'L GND #PWR50\r\n' + 
+'U 1 1 531BABD7\r\n' + 
+'P 11050 1300\r\n' + 
+'F 0 "#PWR50" H 11050 1300 30  0001 L BNN\r\n' + 
+'F 1 "GND" H 11002 1220 30  0000 L BNN\r\n' + 
+'F 2 "GND" H 11050 1300 60  0000 C CNN\r\n' + 
+'F 3 "" H 11050 1300 60  0000 C CNN\r\n' + 
+'	1    11050 1300\r\n' + 
+'	1    0    0    -1  \r\n' + 
+'$EndComp\r\n' + 
+'$Comp\r\n' + 
+'L +3.3V #PWR49\r\n' + 
+'U 1 1 531BB0A1\r\n' + 
+'P 11050 1050\r\n' + 
+'F 0 "#PWR49" V 11050 1050 50  0001 L BNN\r\n' + 
+'F 1 "+3.3V" V 11100 1050 30  0000 L BNN\r\n' + 
+'F 2 "" H 11050 1050 60  0000 C CNN\r\n' + 
+'F 3 "" H 11050 1050 60  0000 C CNN\r\n' + 
+'	1    11050 1050\r\n' + 
+'	1    0    0    -1  \r\n' + 
+'$EndComp\r\n' + 
+'NoConn ~ 6650 4200\r\n' + 
+'NoConn ~ 6250 4400\r\n' + 
+'$Comp\r\n' + 
+'L GND #PWR19\r\n' + 
+'U 1 1 531C809C\r\n' + 
+'P 5950 4700\r\n' + 
+'F 0 "#PWR19" H 5950 4700 30  0001 L BNN\r\n' + 
+'F 1 "GND" H 5902 4620 30  0000 L BNN\r\n' + 
+'F 2 "GND" H 5950 4700 60  0000 C CNN\r\n' + 
+'F 3 "" H 5950 4700 60  0000 C CNN\r\n' + 
+'	1    5950 4700\r\n' + 
+'	1    0    0    -1  \r\n' + 
+'$EndComp\r\n' + 
+'$Comp\r\n' + 
+'L AVR-JTAG-10 JP3\r\n' + 
+'U 1 1 531C7212\r\n' + 
+'P 6450 4400\r\n' + 
+'F 0 "JP3" H 6200 4750 50  0000 L BNN\r\n' + 
+'F 1 "AVR-JTAG-10" H 6450 4400 50  0000 L BNN\r\n' + 
+'F 2 "atmel-AVR-JTAG-10" H 6450 4550 50  0001 C CNN\r\n' + 
+'F 3 "" H 6450 4400 60  0000 C CNN\r\n' + 
+'	1    6450 4400\r\n' + 
+'	1    0    0    -1  \r\n' + 
+'$EndComp\r\n' + 
+'$Comp\r\n' + 
+'L FSM4JSMA-SMD P1\r\n' + 
+'U 1 1 531FA2DC\r\n' + 
+'P 6900 6000\r\n' + 
+'F 0 "P1" V 6640 5925 50  0000 L BNN\r\n' + 
+'F 1 "FSM4JSMA-SMD" H 6400 5700 50  0000 L BNN\r\n' + 
+'F 2 "switch-misc-FSM4JSMA-SMD" H 6900 6150 50  0001 C CNN\r\n' + 
+'F 3 "" H 6900 6000 60  0000 C CNN\r\n' + 
+'	1    6900 6000\r\n' + 
+'	1    0    0    -1  \r\n' + 
+'$EndComp\r\n' + 
+'$Comp\r\n' + 
+'L +3.3V #PWR44\r\n' + 
+'U 1 1 531FD8A0\r\n' + 
+'P 10550 2050\r\n' + 
+'F 0 "#PWR44" V 10550 2050 50  0001 L BNN\r\n' + 
+'F 1 "+3.3V" V 10600 2050 30  0000 L BNN\r\n' + 
+'F 2 "" H 10550 2050 60  0000 C CNN\r\n' + 
+'F 3 "" H 10550 2050 60  0000 C CNN\r\n' + 
+'	1    10550 2050\r\n' + 
+'	1    0    0    -1  \r\n' + 
+'$EndComp\r\n' + 
+'NoConn ~ 10250 2000\r\n' + 
+'$Comp\r\n' + 
+'L PWR_FLAG #PWR01\r\n' + 
+'U 1 1 53C60336\r\n' + 
+'P 10100 2450\r\n' + 
+'F 0 "#PWR01" H 10100 2720 30  0001 C CNN\r\n' + 
+'F 1 "PWR_FLAG" H 10100 2680 30  0000 C CNN\r\n' + 
+'F 2 "" H 10100 2450 60  0000 C CNN\r\n' + 
+'F 3 "" H 10100 2450 60  0000 C CNN\r\n' + 
+'	1    10100 2450\r\n' + 
+'	-1   0    0    1   \r\n' + 
+'$EndComp\r\n' + 
+'$Comp\r\n' + 
+'L +3.3V #PWR42\r\n' + 
+'U 1 1 53C60359\r\n' + 
+'P 10350 2400\r\n' + 
+'F 0 "#PWR42" V 10350 2400 50  0001 L BNN\r\n' + 
+'F 1 "+3.3V" V 10400 2400 30  0000 L BNN\r\n' + 
+'F 2 "" H 10350 2400 60  0000 C CNN\r\n' + 
+'F 3 "" H 10350 2400 60  0000 C CNN\r\n' + 
+'	1    10350 2400\r\n' + 
+'	1    0    0    -1  \r\n' + 
+'$EndComp\r\n' + 
+'$Comp\r\n' + 
+'L PWR_FLAG #PWR02\r\n' + 
+'U 1 1 53C62502\r\n' + 
+'P 10350 2450\r\n' + 
+'F 0 "#PWR02" H 10350 2720 30  0001 C CNN\r\n' + 
+'F 1 "PWR_FLAG" H 10350 2680 30  0000 C CNN\r\n' + 
+'F 2 "" H 10350 2450 60  0000 C CNN\r\n' + 
+'F 3 "" H 10350 2450 60  0000 C CNN\r\n' + 
+'	1    10350 2450\r\n' + 
+'	-1   0    0    1   \r\n' + 
+'$EndComp\r\n' + 
+'$Comp\r\n' + 
+'L PWR_FLAG #PWR03\r\n' + 
+'U 1 1 53C62508\r\n' + 
+'P 10600 2450\r\n' + 
+'F 0 "#PWR03" H 10600 2720 30  0001 C CNN\r\n' + 
+'F 1 "PWR_FLAG" H 10600 2680 30  0000 C CNN\r\n' + 
+'F 2 "" H 10600 2450 60  0000 C CNN\r\n' + 
+'F 3 "" H 10600 2450 60  0000 C CNN\r\n' + 
+'	1    10600 2450\r\n' + 
+'	-1   0    0    1   \r\n' + 
+'$EndComp\r\n' + 
+'NoConn ~ 6900 6200\r\n' + 
+'NoConn ~ 6900 5800\r\n' + 
+'$Comp\r\n' + 
+'L +2.5V #PWR38\r\n' + 
+'U 1 1 53C664E0\r\n' + 
+'P 10100 2400\r\n' + 
+'F 0 "#PWR38" V 10100 2400 50  0001 L BNN\r\n' + 
+'F 1 "+2.5V" V 10150 2400 30  0000 L BNN\r\n' + 
+'F 2 "" H 10100 2400 60  0000 C CNN\r\n' + 
+'F 3 "" H 10100 2400 60  0000 C CNN\r\n' + 
+'	1    10100 2400\r\n' + 
+'	1    0    0    -1  \r\n' + 
+'$EndComp\r\n' + 
+'$Comp\r\n' + 
+'L +5V #PWR45\r\n' + 
+'U 1 1 53C664E6\r\n' + 
+'P 10600 2400\r\n' + 
+'F 0 "#PWR45" V 10600 2400 50  0001 L BNN\r\n' + 
+'F 1 "+5V" V 10650 2400 30  0000 L BNN\r\n' + 
+'F 2 "" H 10600 2400 60  0000 C CNN\r\n' + 
+'F 3 "" H 10600 2400 60  0000 C CNN\r\n' + 
+'	1    10600 2400\r\n' + 
+'	1    0    0    -1  \r\n' + 
+'$EndComp\r\n' + 
+'Wire Wire Line\r\n' + 
+'	10600 2400 10600 2450\r\n' + 
+'Wire Wire Line\r\n' + 
+'	10350 2450 10350 2400\r\n' + 
+'Wire Wire Line\r\n' + 
+'	10850 4500 10850 4450\r\n' + 
+'Wire Wire Line\r\n' + 
+'	10150 4650 10150 4700\r\n' + 
+'Wire Wire Line\r\n' + 
+'	8600 5650 8600 5700\r\n' + 
+'Wire Wire Line\r\n' + 
+'	7050 6200 7050 6250\r\n' + 
+'Wire Wire Line\r\n' + 
+'	7750 3300 7750 3350\r\n' + 
+'Wire Wire Line\r\n' + 
+'	6900 3150 6900 3200\r\n' + 
+'Wire Wire Line\r\n' + 
+'	6000 3250 6000 3200\r\n' + 
+'Wire Wire Line\r\n' + 
+'	5850 3400 5850 3350\r\n' + 
+'Wire Wire Line\r\n' + 
+'	5800 4600 5800 4650\r\n' + 
+'Wire Wire Line\r\n' + 
+'	6500 5900 6500 5950\r\n' + 
+'Wire Wire Line\r\n' + 
+'	6400 5800 6400 5750\r\n' + 
+'Wire Wire Line\r\n' + 
+'	5650 5900 5650 5850\r\n' + 
+'Wire Wire Line\r\n' + 
+'	4050 1500 4050 1550\r\n' + 
+'Wire Wire Line\r\n' + 
+'	2200 1650 2200 1700\r\n' + 
+'Wire Wire Line\r\n' + 
+'	1600 1150 1600 1200\r\n' + 
+'Wire Wire Line\r\n' + 
+'	11100 1750 11100 1700\r\n' + 
+'Wire Wire Line\r\n' + 
+'	11050 1250 11050 1300\r\n' + 
+'Wire Wire Line\r\n' + 
+'	11050 1100 11050 1050\r\n' + 
+'Wire Wire Line\r\n' + 
+'	11100 1550 11100 1500\r\n' + 
+'Wire Wire Line\r\n' + 
+'	10550 2100 10550 2050\r\n' + 
+'Wire Wire Line\r\n' + 
+'	10100 2450 10100 2400\r\n' + 
+'Wire Wire Line\r\n' + 
+'	3600 3600 3900 3600\r\n' + 
+'Wire Wire Line\r\n' + 
+'	3650 3550 3900 3550\r\n' + 
+'Wire Wire Line\r\n' + 
+'	3700 3700 3900 3700\r\n' + 
+'Wire Wire Line\r\n' + 
+'	3750 3650 3900 3650\r\n' + 
+'Connection ~ 9950 5800\r\n' + 
+'Wire Wire Line\r\n' + 
+'	9950 6450 9950 5800\r\n' + 
+'Connection ~ 9100 5750\r\n' + 
+'Wire Wire Line\r\n' + 
+'	9100 6050 9100 5750\r\n' + 
+'Connection ~ 8800 6250\r\n' + 
+'Wire Wire Line\r\n' + 
+'	8800 5850 8800 6250\r\n' + 
+'Wire Wire Line\r\n' + 
+'	10350 2100 10550 2100\r\n' + 
+'Wire Wire Line\r\n' + 
+'	10350 2000 10350 2100\r\n' + 
+'Wire Wire Line\r\n' + 
+'	7050 6200 7000 6200\r\n' + 
+'Wire Wire Line\r\n' + 
+'	8050 2500 8050 1250\r\n' + 
+'Wire Wire Line\r\n' + 
+'	9200 2500 8050 2500\r\n' + 
+'Wire Wire Line\r\n' + 
+'	9200 4800 9200 2500\r\n' + 
+'Wire Wire Line\r\n' + 
+'	7650 4800 9200 4800\r\n' + 
+'Wire Wire Line\r\n' + 
+'	7650 4300 7650 4800\r\n' + 
+'Wire Wire Line\r\n' + 
+'	7700 4750 7700 4300\r\n' + 
+'Wire Wire Line\r\n' + 
+'	9150 4750 7700 4750\r\n' + 
+'Wire Wire Line\r\n' + 
+'	9150 2550 9150 4750\r\n' + 
+'Wire Wire Line\r\n' + 
+'	6600 2550 9150 2550\r\n' + 
+'Wire Wire Line\r\n' + 
+'	7750 4700 7750 4300\r\n' + 
+'Wire Wire Line\r\n' + 
+'	9100 4700 7750 4700\r\n' + 
+'Wire Wire Line\r\n' + 
+'	9100 2600 9100 4700\r\n' + 
+'Wire Wire Line\r\n' + 
+'	6550 2600 9100 2600\r\n' + 
+'Wire Wire Line\r\n' + 
+'	9050 2650 6500 2650\r\n' + 
+'Wire Wire Line\r\n' + 
+'	9050 4650 9050 2650\r\n' + 
+'Wire Wire Line\r\n' + 
+'	7800 4650 9050 4650\r\n' + 
+'Wire Wire Line\r\n' + 
+'	7800 4300 7800 4650\r\n' + 
+'Wire Wire Line\r\n' + 
+'	6250 4300 6000 4300\r\n' + 
+'Wire Wire Line\r\n' + 
+'	6000 4300 6000 4050\r\n' + 
+'Wire Wire Line\r\n' + 
+'	6000 4050 7100 4050\r\n' + 
+'Wire Wire Line\r\n' + 
+'	6250 4500 5950 4500\r\n' + 
+'Wire Wire Line\r\n' + 
+'	5950 4600 6250 4600\r\n' + 
+'Wire Wire Line\r\n' + 
+'	5950 4500 5950 4700\r\n' + 
+'Connection ~ 5950 4600\r\n' + 
+'Connection ~ 7100 4050\r\n' + 
+'Wire Wire Line\r\n' + 
+'	8000 4400 6650 4400\r\n' + 
+'Wire Wire Line\r\n' + 
+'	8000 4300 8000 4400\r\n' + 
+'Wire Wire Line\r\n' + 
+'	7950 4600 6650 4600\r\n' + 
+'Wire Wire Line\r\n' + 
+'	7950 4300 7950 4600\r\n' + 
+'Wire Wire Line\r\n' + 
+'	7850 4500 7850 4300\r\n' + 
+'Wire Wire Line\r\n' + 
+'	7900 4450 7900 4300\r\n' + 
+'Wire Wire Line\r\n' + 
+'	7000 4450 7900 4450\r\n' + 
+'Wire Wire Line\r\n' + 
+'	7000 4300 7000 4450\r\n' + 
+'Wire Wire Line\r\n' + 
+'	6650 4300 7000 4300\r\n' + 
+'Wire Wire Line\r\n' + 
+'	6650 4500 7850 4500\r\n' + 
+'Wire Wire Line\r\n' + 
+'	7400 6350 7400 4300\r\n' + 
+'Wire Wire Line\r\n' + 
+'	7350 4300 7350 6300\r\n' + 
+'Wire Wire Line\r\n' + 
+'	8950 5850 8800 5850\r\n' + 
+'Wire Wire Line\r\n' + 
+'	8950 5700 8950 5850\r\n' + 
+'Wire Wire Line\r\n' + 
+'	10350 5700 8950 5700\r\n' + 
+'Wire Wire Line\r\n' + 
+'	8450 5350 8450 4300\r\n' + 
+'Wire Wire Line\r\n' + 
+'	4400 5300 8400 5300\r\n' + 
+'Wire Wire Line\r\n' + 
+'	8350 5250 4450 5250\r\n' + 
+'Wire Wire Line\r\n' + 
+'	8300 5200 4500 5200\r\n' + 
+'Wire Wire Line\r\n' + 
+'	8250 5150 4550 5150\r\n' + 
+'Wire Wire Line\r\n' + 
+'	8200 5100 4600 5100\r\n' + 
+'Wire Wire Line\r\n' + 
+'	1500 6350 1500 950 \r\n' + 
+'Wire Wire Line\r\n' + 
+'	8350 1650 9700 1650\r\n' + 
+'Wire Wire Line\r\n' + 
+'	8300 1550 9700 1550\r\n' + 
+'Wire Wire Line\r\n' + 
+'	9450 1400 9600 1400\r\n' + 
+'Wire Wire Line\r\n' + 
+'	9450 1300 9450 1400\r\n' + 
+'Connection ~ 9600 1150\r\n' + 
+'Wire Wire Line\r\n' + 
+'	9600 1100 9600 1250\r\n' + 
+'Wire Wire Line\r\n' + 
+'	9600 1250 9700 1250\r\n' + 
+'Wire Wire Line\r\n' + 
+'	9450 1150 9700 1150\r\n' + 
+'Connection ~ 10900 1850\r\n' + 
+'Wire Wire Line\r\n' + 
+'	10900 1850 10700 1850\r\n' + 
+'Connection ~ 10900 1750\r\n' + 
+'Wire Wire Line\r\n' + 
+'	10750 1750 10700 1750\r\n' + 
+'Wire Wire Line\r\n' + 
+'	10900 1650 10900 2000\r\n' + 
+'Wire Wire Line\r\n' + 
+'	10700 1650 10900 1650\r\n' + 
+'Wire Wire Line\r\n' + 
+'	7100 5800 7000 5800\r\n' + 
+'Wire Wire Line\r\n' + 
+'	7300 5700 7300 5800\r\n' + 
+'Connection ~ 7100 5700\r\n' + 
+'Wire Wire Line\r\n' + 
+'	8350 4300 8350 5250\r\n' + 
+'Wire Wire Line\r\n' + 
+'	8400 5300 8400 4300\r\n' + 
+'Wire Wire Line\r\n' + 
+'	8800 4300 8800 5650\r\n' + 
+'Wire Wire Line\r\n' + 
+'	8700 4500 8700 4300\r\n' + 
+'Wire Wire Line\r\n' + 
+'	8750 4350 8750 4300\r\n' + 
+'Wire Wire Line\r\n' + 
+'	3250 3250 3850 3250\r\n' + 
+'Connection ~ 4300 2400\r\n' + 
+'Wire Wire Line\r\n' + 
+'	3800 2400 4400 2400\r\n' + 
+'Wire Wire Line\r\n' + 
+'	4400 1750 4500 1750\r\n' + 
+'Connection ~ 5900 2000\r\n' + 
+'Wire Wire Line\r\n' + 
+'	5450 1650 5350 1650\r\n' + 
+'Wire Wire Line\r\n' + 
+'	5450 1800 5450 1650\r\n' + 
+'Wire Wire Line\r\n' + 
+'	5900 1800 5450 1800\r\n' + 
+'Wire Wire Line\r\n' + 
+'	5900 1800 5900 2100\r\n' + 
+'Wire Wire Line\r\n' + 
+'	4500 1500 4050 1500\r\n' + 
+'Wire Wire Line\r\n' + 
+'	5950 1650 5950 1900\r\n' + 
+'Wire Wire Line\r\n' + 
+'	5550 1650 5950 1650\r\n' + 
+'Wire Wire Line\r\n' + 
+'	5550 1500 5550 1650\r\n' + 
+'Wire Wire Line\r\n' + 
+'	5350 1500 5550 1500\r\n' + 
+'Connection ~ 4400 1450\r\n' + 
+'Wire Wire Line\r\n' + 
+'	2300 1050 2300 1350\r\n' + 
+'Connection ~ 2200 1450\r\n' + 
+'Wire Wire Line\r\n' + 
+'	1550 1450 4500 1450\r\n' + 
+'Wire Wire Line\r\n' + 
+'	7350 6300 1550 6300\r\n' + 
+'Connection ~ 1500 950 \r\n' + 
+'Wire Wire Line\r\n' + 
+'	1550 6300 1550 1450\r\n' + 
+'Connection ~ 5450 1200\r\n' + 
+'Wire Wire Line\r\n' + 
+'	4450 1200 5450 1200\r\n' + 
+'Wire Wire Line\r\n' + 
+'	4400 1450 4400 1100\r\n' + 
+'Wire Wire Line\r\n' + 
+'	5950 1250 6650 1250\r\n' + 
+'Wire Wire Line\r\n' + 
+'	5950 750  6650 750 \r\n' + 
+'Wire Wire Line\r\n' + 
+'	5450 750  5750 750 \r\n' + 
+'Wire Wire Line\r\n' + 
+'	5950 1000 6650 1000\r\n' + 
+'Wire Wire Line\r\n' + 
+'	5550 1000 5750 1000\r\n' + 
+'Wire Wire Line\r\n' + 
+'	6500 2650 6500 800 \r\n' + 
+'Wire Wire Line\r\n' + 
+'	6500 800  6650 800 \r\n' + 
+'Wire Wire Line\r\n' + 
+'	6550 1050 6550 2600\r\n' + 
+'Wire Wire Line\r\n' + 
+'	6250 1350 6650 1350\r\n' + 
+'Wire Wire Line\r\n' + 
+'	6600 1300 6600 2550\r\n' + 
+'Wire Wire Line\r\n' + 
+'	10300 6000 10100 6000\r\n' + 
+'Wire Wire Line\r\n' + 
+'	10100 6000 10100 6300\r\n' + 
+'Wire Wire Line\r\n' + 
+'	8700 6250 9100 6250\r\n' + 
+'Wire Wire Line\r\n' + 
+'	9950 6450 9900 6450\r\n' + 
+'Wire Wire Line\r\n' + 
+'	9900 6150 9900 6250\r\n' + 
+'Wire Wire Line\r\n' + 
+'	10100 6150 9900 6150\r\n' + 
+'Wire Wire Line\r\n' + 
+'	5950 2000 5900 2000\r\n' + 
+'Wire Wire Line\r\n' + 
+'	4450 1400 4500 1400\r\n' + 
+'Wire Wire Line\r\n' + 
+'	4450 1200 4450 1400\r\n' + 
+'Wire Wire Line\r\n' + 
+'	8400 6100 8400 6150\r\n' + 
+'Wire Wire Line\r\n' + 
+'	8900 4300 8900 5800\r\n' + 
+'Wire Wire Line\r\n' + 
+'	8850 5750 8850 4300\r\n' + 
+'Wire Wire Line\r\n' + 
+'	10300 5850 10300 6000\r\n' + 
+'Wire Wire Line\r\n' + 
+'	10350 5850 10300 5850\r\n' + 
+'Wire Wire Line\r\n' + 
+'	10350 6150 10350 5900\r\n' + 
+'Wire Wire Line\r\n' + 
+'	10300 6150 10350 6150\r\n' + 
+'Connection ~ 10300 6300\r\n' + 
+'Wire Wire Line\r\n' + 
+'	10300 6150 10300 6400\r\n' + 
+'Wire Wire Line\r\n' + 
+'	10250 6300 10300 6300\r\n' + 
+'Connection ~ 10100 6150\r\n' + 
+'Connection ~ 2500 550 \r\n' + 
+'Connection ~ 1700 950 \r\n' + 
+'Wire Wire Line\r\n' + 
+'	1900 950  1700 950 \r\n' + 
+'Connection ~ 1700 1150\r\n' + 
+'Wire Wire Line\r\n' + 
+'	1700 1150 1600 1150\r\n' + 
+'Wire Wire Line\r\n' + 
+'	2100 550  2100 1150\r\n' + 
+'Wire Wire Line\r\n' + 
+'	2300 550  2700 550 \r\n' + 
+'Connection ~ 2850 750 \r\n' + 
+'Wire Wire Line\r\n' + 
+'	2850 750  2700 750 \r\n' + 
+'Wire Wire Line\r\n' + 
+'	2850 800  2900 800 \r\n' + 
+'Connection ~ 7500 750 \r\n' + 
+'Wire Wire Line\r\n' + 
+'	7250 750  7550 750 \r\n' + 
+'Wire Wire Line\r\n' + 
+'	8150 750  7750 750 \r\n' + 
+'Connection ~ 6100 2000\r\n' + 
+'Wire Wire Line\r\n' + 
+'	5950 1900 6100 1900\r\n' + 
+'Wire Wire Line\r\n' + 
+'	8850 5750 10350 5750\r\n' + 
+'Wire Wire Line\r\n' + 
+'	8900 5800 10350 5800\r\n' + 
+'Wire Wire Line\r\n' + 
+'	4350 1700 4500 1700\r\n' + 
+'Wire Wire Line\r\n' + 
+'	4400 2400 4400 1750\r\n' + 
+'Wire Wire Line\r\n' + 
+'	4250 1550 4500 1550\r\n' + 
+'Wire Wire Line\r\n' + 
+'	4200 1600 4500 1600\r\n' + 
+'Wire Wire Line\r\n' + 
+'	6650 1300 6600 1300\r\n' + 
+'Wire Wire Line\r\n' + 
+'	6550 1050 6650 1050\r\n' + 
+'Wire Wire Line\r\n' + 
+'	4850 1950 4850 2200\r\n' + 
+'Wire Wire Line\r\n' + 
+'	5500 1950 4850 1950\r\n' + 
+'Wire Wire Line\r\n' + 
+'	4900 2000 4900 2250\r\n' + 
+'Wire Wire Line\r\n' + 
+'	5550 2000 4900 2000\r\n' + 
+'Wire Wire Line\r\n' + 
+'	4950 2050 4950 2300\r\n' + 
+'Wire Wire Line\r\n' + 
+'	5600 2050 4950 2050\r\n' + 
+'Wire Wire Line\r\n' + 
+'	5000 2100 5000 2350\r\n' + 
+'Wire Wire Line\r\n' + 
+'	5650 2100 5000 2100\r\n' + 
+'Wire Wire Line\r\n' + 
+'	6350 1200 6250 1200\r\n' + 
+'Wire Wire Line\r\n' + 
+'	6000 1200 6050 1200\r\n' + 
+'Wire Wire Line\r\n' + 
+'	8050 1250 7250 1250\r\n' + 
+'Connection ~ 7700 1350\r\n' + 
+'Connection ~ 7600 1350\r\n' + 
+'Wire Wire Line\r\n' + 
+'	7250 1350 7700 1350\r\n' + 
+'Connection ~ 7400 2100\r\n' + 
+'Connection ~ 7400 1300\r\n' + 
+'Wire Wire Line\r\n' + 
+'	7400 1300 7250 1300\r\n' + 
+'Connection ~ 6350 1350\r\n' + 
+'Connection ~ 6350 1100\r\n' + 
+'Wire Wire Line\r\n' + 
+'	6350 1100 6650 1100\r\n' + 
+'Wire Wire Line\r\n' + 
+'	6250 1350 6250 1900\r\n' + 
+'Connection ~ 6350 1200\r\n' + 
+'Connection ~ 6000 1250\r\n' + 
+'Wire Wire Line\r\n' + 
+'	6000 1200 6000 1250\r\n' + 
+'Wire Wire Line\r\n' + 
+'	5550 1000 5550 1450\r\n' + 
+'Wire Wire Line\r\n' + 
+'	5550 1450 5350 1450\r\n' + 
+'Wire Wire Line\r\n' + 
+'	5450 1400 5350 1400\r\n' + 
+'Wire Wire Line\r\n' + 
+'	5450 750  5450 1400\r\n' + 
+'Connection ~ 5650 1550\r\n' + 
+'Wire Wire Line\r\n' + 
+'	5350 1550 5750 1550\r\n' + 
+'Wire Wire Line\r\n' + 
+'	5650 1550 5650 2100\r\n' + 
+'Wire Wire Line\r\n' + 
+'	5600 1600 5350 1600\r\n' + 
+'Wire Wire Line\r\n' + 
+'	5600 1600 5600 2050\r\n' + 
+'Wire Wire Line\r\n' + 
+'	5500 1750 5350 1750\r\n' + 
+'Wire Wire Line\r\n' + 
+'	5500 1750 5500 1950\r\n' + 
+'Wire Wire Line\r\n' + 
+'	5550 1700 5350 1700\r\n' + 
+'Wire Wire Line\r\n' + 
+'	5550 1700 5550 2000\r\n' + 
+'Wire Wire Line\r\n' + 
+'	4600 2350 4600 3000\r\n' + 
+'Wire Wire Line\r\n' + 
+'	5000 2350 4600 2350\r\n' + 
+'Wire Wire Line\r\n' + 
+'	4950 2300 4550 2300\r\n' + 
+'Wire Wire Line\r\n' + 
+'	4550 2300 4550 3000\r\n' + 
+'Wire Wire Line\r\n' + 
+'	4500 2250 4500 3000\r\n' + 
+'Wire Wire Line\r\n' + 
+'	4900 2250 4500 2250\r\n' + 
+'Wire Wire Line\r\n' + 
+'	4850 2200 4450 2200\r\n' + 
+'Wire Wire Line\r\n' + 
+'	4350 2350 3800 2350\r\n' + 
+'Wire Wire Line\r\n' + 
+'	3750 2650 3750 3650\r\n' + 
+'Wire Wire Line\r\n' + 
+'	3700 2600 3700 3700\r\n' + 
+'Connection ~ 5850 3600\r\n' + 
+'Connection ~ 5750 3600\r\n' + 
+'Connection ~ 5650 3600\r\n' + 
+'Connection ~ 5550 3600\r\n' + 
+'Connection ~ 5550 3650\r\n' + 
+'Wire Wire Line\r\n' + 
+'	5850 3550 5850 3650\r\n' + 
+'Wire Wire Line\r\n' + 
+'	5750 3600 5750 3650\r\n' + 
+'Wire Wire Line\r\n' + 
+'	5650 3600 5650 3650\r\n' + 
+'Wire Wire Line\r\n' + 
+'	5550 3850 5450 3850\r\n' + 
+'Wire Wire Line\r\n' + 
+'	5550 3650 5450 3650\r\n' + 
+'Wire Wire Line\r\n' + 
+'	5550 3600 5550 3850\r\n' + 
+'Wire Wire Line\r\n' + 
+'	5450 3600 5850 3600\r\n' + 
+'Wire Wire Line\r\n' + 
+'	7500 750  7500 2350\r\n' + 
+'Connection ~ 5650 4000\r\n' + 
+'Wire Wire Line\r\n' + 
+'	5450 4000 6900 4000\r\n' + 
+'Wire Wire Line\r\n' + 
+'	5650 4000 5650 4100\r\n' + 
+'Wire Wire Line\r\n' + 
+'	8250 4300 8250 5150\r\n' + 
+'Wire Wire Line\r\n' + 
+'	3600 5450 8600 5450\r\n' + 
+'Wire Wire Line\r\n' + 
+'	3600 5450 3600 3950\r\n' + 
+'Wire Wire Line\r\n' + 
+'	3600 3950 3900 3950\r\n' + 
+'Wire Wire Line\r\n' + 
+'	3650 5400 8550 5400\r\n' + 
+'Wire Wire Line\r\n' + 
+'	3650 5400 3650 4000\r\n' + 
+'Wire Wire Line\r\n' + 
+'	3650 4000 3900 4000\r\n' + 
+'Wire Wire Line\r\n' + 
+'	3400 2250 3400 2600\r\n' + 
+'Wire Wire Line\r\n' + 
+'	3500 2250 3400 2250\r\n' + 
+'Wire Wire Line\r\n' + 
+'	3150 2150 3150 2400\r\n' + 
+'Wire Wire Line\r\n' + 
+'	4550 5150 4550 4550\r\n' + 
+'Wire Wire Line\r\n' + 
+'	8600 5450 8600 4300\r\n' + 
+'Wire Wire Line\r\n' + 
+'	5450 3950 6850 3950\r\n' + 
+'Wire Wire Line\r\n' + 
+'	8200 4300 8200 5100\r\n' + 
+'Wire Wire Line\r\n' + 
+'	3350 2300 3500 2300\r\n' + 
+'Wire Wire Line\r\n' + 
+'	5600 2950 8650 2950\r\n' + 
+'Wire Wire Line\r\n' + 
+'	5600 2950 5600 3550\r\n' + 
+'Wire Wire Line\r\n' + 
+'	5600 3550 5450 3550\r\n' + 
+'Wire Wire Line\r\n' + 
+'	7050 5650 5950 5650\r\n' + 
+'Wire Wire Line\r\n' + 
+'	5950 5650 5950 5800\r\n' + 
+'Wire Wire Line\r\n' + 
+'	4900 2800 4900 3000\r\n' + 
+'Wire Wire Line\r\n' + 
+'	4900 2800 8800 2800\r\n' + 
+'Wire Wire Line\r\n' + 
+'	4950 2850 8750 2850\r\n' + 
+'Wire Wire Line\r\n' + 
+'	4950 2850 4950 3000\r\n' + 
+'Wire Wire Line\r\n' + 
+'	4300 2600 4300 2400\r\n' + 
+'Wire Wire Line\r\n' + 
+'	3700 2600 4300 2600\r\n' + 
+'Wire Wire Line\r\n' + 
+'	3700 5350 8450 5350\r\n' + 
+'Wire Wire Line\r\n' + 
+'	3700 5350 3700 4050\r\n' + 
+'Wire Wire Line\r\n' + 
+'	8750 4350 10200 4350\r\n' + 
+'Connection ~ 4200 2250\r\n' + 
+'Wire Wire Line\r\n' + 
+'	3600 2500 3600 3600\r\n' + 
+'Wire Wire Line\r\n' + 
+'	4200 2500 3600 2500\r\n' + 
+'Wire Wire Line\r\n' + 
+'	4200 2250 3800 2250\r\n' + 
+'Wire Wire Line\r\n' + 
+'	4200 1600 4200 2500\r\n' + 
+'Wire Wire Line\r\n' + 
+'	3550 5500 3550 3900\r\n' + 
+'Wire Wire Line\r\n' + 
+'	3550 5500 8650 5500\r\n' + 
+'Wire Wire Line\r\n' + 
+'	5950 6100 5950 5900\r\n' + 
+'Wire Wire Line\r\n' + 
+'	6600 6100 5950 6100\r\n' + 
+'Wire Wire Line\r\n' + 
+'	6600 5700 6600 6100\r\n' + 
+'Wire Wire Line\r\n' + 
+'	7100 5700 6600 5700\r\n' + 
+'Wire Wire Line\r\n' + 
+'	7100 3350 7100 5800\r\n' + 
+'Wire Wire Line\r\n' + 
+'	7200 3350 7200 3600\r\n' + 
+'Wire Wire Line\r\n' + 
+'	7100 3350 7200 3350\r\n' + 
+'Wire Wire Line\r\n' + 
+'	7050 3300 7050 5650\r\n' + 
+'Wire Wire Line\r\n' + 
+'	7250 3300 7250 3600\r\n' + 
+'Wire Wire Line\r\n' + 
+'	7050 3300 7250 3300\r\n' + 
+'Wire Wire Line\r\n' + 
+'	7250 1000 8100 1000\r\n' + 
+'Wire Wire Line\r\n' + 
+'	5550 2900 8700 2900\r\n' + 
+'Wire Wire Line\r\n' + 
+'	5550 2900 5550 3500\r\n' + 
+'Wire Wire Line\r\n' + 
+'	4850 2750 4850 3000\r\n' + 
+'Connection ~ 6000 1000\r\n' + 
+'Wire Wire Line\r\n' + 
+'	6000 950  6000 1000\r\n' + 
+'Wire Wire Line\r\n' + 
+'	6050 950  6000 950 \r\n' + 
+'Connection ~ 6700 3250\r\n' + 
+'Connection ~ 6800 3250\r\n' + 
+'Wire Wire Line\r\n' + 
+'	6600 3000 6600 3300\r\n' + 
+'Wire Wire Line\r\n' + 
+'	6700 3250 6700 3300\r\n' + 
+'Wire Wire Line\r\n' + 
+'	6800 3250 6800 3300\r\n' + 
+'Wire Wire Line\r\n' + 
+'	8700 4500 10200 4500\r\n' + 
+'Wire Wire Line\r\n' + 
+'	4600 5100 4600 4550\r\n' + 
+'Wire Wire Line\r\n' + 
+'	10400 4650 10450 4650\r\n' + 
+'Wire Wire Line\r\n' + 
+'	10450 4500 10400 4500\r\n' + 
+'Wire Wire Line\r\n' + 
+'	10400 4350 10450 4350\r\n' + 
+'Wire Wire Line\r\n' + 
+'	7200 4850 4850 4850\r\n' + 
+'Wire Wire Line\r\n' + 
+'	4850 4850 4850 4550\r\n' + 
+'Connection ~ 4250 2300\r\n' + 
+'Wire Wire Line\r\n' + 
+'	4250 2300 3800 2300\r\n' + 
+'Wire Wire Line\r\n' + 
+'	4250 1550 4250 2550\r\n' + 
+'Wire Wire Line\r\n' + 
+'	4250 2550 3650 2550\r\n' + 
+'Wire Wire Line\r\n' + 
+'	3650 2550 3650 3550\r\n' + 
+'Wire Wire Line\r\n' + 
+'	4450 5250 4450 4550\r\n' + 
+'Connection ~ 4350 2350\r\n' + 
+'Wire Wire Line\r\n' + 
+'	4350 1700 4350 2650\r\n' + 
+'Wire Wire Line\r\n' + 
+'	4350 2650 3750 2650\r\n' + 
+'Connection ~ 6000 750 \r\n' + 
+'Wire Wire Line\r\n' + 
+'	6000 700  6000 750 \r\n' + 
+'Wire Wire Line\r\n' + 
+'	6050 700  6000 700 \r\n' + 
+'Wire Wire Line\r\n' + 
+'	4650 5050 4650 4550\r\n' + 
+'Wire Wire Line\r\n' + 
+'	4650 5050 8100 5050\r\n' + 
+'Connection ~ 6100 2100\r\n' + 
+'Wire Wire Line\r\n' + 
+'	6100 1900 6100 2250\r\n' + 
+'Connection ~ 3850 3250\r\n' + 
+'Connection ~ 3450 3250\r\n' + 
+'Connection ~ 3350 3250\r\n' + 
+'Connection ~ 3850 3500\r\n' + 
+'Connection ~ 3850 3750\r\n' + 
+'Connection ~ 3850 3800\r\n' + 
+'Connection ~ 3850 4600\r\n' + 
+'Connection ~ 4900 4600\r\n' + 
+'Connection ~ 5500 4350\r\n' + 
+'Connection ~ 5500 3900\r\n' + 
+'Connection ~ 5750 3850\r\n' + 
+'Connection ~ 5500 3700\r\n' + 
+'Connection ~ 4700 2950\r\n' + 
+'Wire Wire Line\r\n' + 
+'	3450 3250 3450 3150\r\n' + 
+'Wire Wire Line\r\n' + 
+'	3350 3250 3350 3150\r\n' + 
+'Wire Wire Line\r\n' + 
+'	3250 3150 3250 3250\r\n' + 
+'Wire Wire Line\r\n' + 
+'	3850 3500 3900 3500\r\n' + 
+'Wire Wire Line\r\n' + 
+'	3850 3750 3900 3750\r\n' + 
+'Wire Wire Line\r\n' + 
+'	3850 3800 3900 3800\r\n' + 
+'Wire Wire Line\r\n' + 
+'	3850 2950 3850 4700\r\n' + 
+'Wire Wire Line\r\n' + 
+'	4900 4600 4900 4550\r\n' + 
+'Wire Wire Line\r\n' + 
+'	5500 4600 3850 4600\r\n' + 
+'Wire Wire Line\r\n' + 
+'	5500 4350 5650 4350\r\n' + 
+'Wire Wire Line\r\n' + 
+'	5750 3900 5750 3800\r\n' + 
+'Wire Wire Line\r\n' + 
+'	5650 3850 5850 3850\r\n' + 
+'Wire Wire Line\r\n' + 
+'	5650 3800 5650 3850\r\n' + 
+'Wire Wire Line\r\n' + 
+'	5850 3850 5850 3800\r\n' + 
+'Wire Wire Line\r\n' + 
+'	5450 3900 5750 3900\r\n' + 
+'Wire Wire Line\r\n' + 
+'	5500 3700 5450 3700\r\n' + 
+'Wire Wire Line\r\n' + 
+'	5500 2950 5500 4600\r\n' + 
+'Wire Wire Line\r\n' + 
+'	4700 2950 4700 3000\r\n' + 
+'Wire Wire Line\r\n' + 
+'	3850 2950 5500 2950\r\n' + 
+'Wire Wire Line\r\n' + 
+'	5650 4350 5650 4300\r\n' + 
+'Wire Wire Line\r\n' + 
+'	10150 4650 10200 4650\r\n' + 
+'Connection ~ 5000 900 \r\n' + 
+'Connection ~ 5000 800 \r\n' + 
+'Wire Wire Line\r\n' + 
+'	5000 900  4900 900 \r\n' + 
+'Wire Wire Line\r\n' + 
+'	4950 800  5000 800 \r\n' + 
+'Wire Wire Line\r\n' + 
+'	5000 700  5000 1000\r\n' + 
+'Wire Wire Line\r\n' + 
+'	4900 700  5000 700 \r\n' + 
+'Wire Wire Line\r\n' + 
+'	4900 650  4900 700 \r\n' + 
+'Connection ~ 6700 3500\r\n' + 
+'Connection ~ 6650 3500\r\n' + 
+'Wire Wire Line\r\n' + 
+'	6800 3500 6800 3450\r\n' + 
+'Wire Wire Line\r\n' + 
+'	6700 3500 6700 3450\r\n' + 
+'Wire Wire Line\r\n' + 
+'	6650 3500 6650 3600\r\n' + 
+'Wire Wire Line\r\n' + 
+'	6600 3500 6600 3450\r\n' + 
+'Connection ~ 7600 2100\r\n' + 
+'Connection ~ 6800 2100\r\n' + 
+'Connection ~ 6350 2100\r\n' + 
+'Connection ~ 7400 1050\r\n' + 
+'Wire Wire Line\r\n' + 
+'	7700 2100 7700 2050\r\n' + 
+'Wire Wire Line\r\n' + 
+'	7600 2100 7600 2050\r\n' + 
+'Wire Wire Line\r\n' + 
+'	6350 2100 6350 2050\r\n' + 
+'Wire Wire Line\r\n' + 
+'	6250 2050 6250 2100\r\n' + 
+'Wire Wire Line\r\n' + 
+'	6800 2100 6800 2200\r\n' + 
+'Wire Wire Line\r\n' + 
+'	6250 2100 7700 2100\r\n' + 
+'Wire Wire Line\r\n' + 
+'	7400 800  7400 2100\r\n' + 
+'Wire Wire Line\r\n' + 
+'	7250 800  7400 800 \r\n' + 
+'Wire Wire Line\r\n' + 
+'	7250 1050 7400 1050\r\n' + 
+'Connection ~ 3700 1050\r\n' + 
+'Connection ~ 3450 1050\r\n' + 
+'Connection ~ 3500 1050\r\n' + 
+'Connection ~ 3900 1050\r\n' + 
+'Connection ~ 4250 1050\r\n' + 
+'Wire Wire Line\r\n' + 
+'	3700 1050 3700 1150\r\n' + 
+'Wire Wire Line\r\n' + 
+'	3450 850  3450 1050\r\n' + 
+'Wire Wire Line\r\n' + 
+'	3400 850  3450 850 \r\n' + 
+'Wire Wire Line\r\n' + 
+'	3500 1050 3500 1000\r\n' + 
+'Wire Wire Line\r\n' + 
+'	3900 1050 3900 1000\r\n' + 
+'Wire Wire Line\r\n' + 
+'	4250 1050 4250 1000\r\n' + 
+'Wire Wire Line\r\n' + 
+'	4600 1050 4600 1000\r\n' + 
+'Wire Wire Line\r\n' + 
+'	2850 1050 4600 1050\r\n' + 
+'Wire Wire Line\r\n' + 
+'	2850 1000 2850 1050\r\n' + 
+'Wire Wire Line\r\n' + 
+'	8150 5000 8150 4300\r\n' + 
+'Wire Wire Line\r\n' + 
+'	4700 5000 8150 5000\r\n' + 
+'Wire Wire Line\r\n' + 
+'	4800 4900 4800 4550\r\n' + 
+'Connection ~ 4700 800 \r\n' + 
+'Connection ~ 4700 700 \r\n' + 
+'Wire Wire Line\r\n' + 
+'	4700 900  4800 900 \r\n' + 
+'Wire Wire Line\r\n' + 
+'	4700 800  4800 800 \r\n' + 
+'Wire Wire Line\r\n' + 
+'	4850 700  4850 650 \r\n' + 
+'Wire Wire Line\r\n' + 
+'	4700 700  4850 700 \r\n' + 
+'Wire Wire Line\r\n' + 
+'	4700 600  4700 900 \r\n' + 
+'Connection ~ 2850 800 \r\n' + 
+'Wire Wire Line\r\n' + 
+'	2850 600  2850 850 \r\n' + 
+'Connection ~ 3450 2900\r\n' + 
+'Connection ~ 3350 2900\r\n' + 
+'Connection ~ 3800 2900\r\n' + 
+'Connection ~ 4400 2900\r\n' + 
+'Wire Wire Line\r\n' + 
+'	3450 2900 3450 3000\r\n' + 
+'Wire Wire Line\r\n' + 
+'	3350 3000 3350 2900\r\n' + 
+'Wire Wire Line\r\n' + 
+'	3250 2900 3250 3000\r\n' + 
+'Wire Wire Line\r\n' + 
+'	3800 3850 3900 3850\r\n' + 
+'Wire Wire Line\r\n' + 
+'	3800 2850 3800 3850\r\n' + 
+'Wire Wire Line\r\n' + 
+'	4400 2900 4400 3000\r\n' + 
+'Wire Wire Line\r\n' + 
+'	3250 2900 4650 2900\r\n' + 
+'Wire Wire Line\r\n' + 
+'	4650 2900 4650 3000\r\n' + 
+'Connection ~ 10650 4500\r\n' + 
+'Wire Wire Line\r\n' + 
+'	10650 4650 10600 4650\r\n' + 
+'Wire Wire Line\r\n' + 
+'	10650 4350 10600 4350\r\n' + 
+'Wire Wire Line\r\n' + 
+'	10600 4500 10850 4500\r\n' + 
+'Wire Wire Line\r\n' + 
+'	10650 4350 10650 4650\r\n' + 
+'Connection ~ 7600 1100\r\n' + 
+'Connection ~ 7450 1100\r\n' + 
+'Connection ~ 7450 850 \r\n' + 
+'Wire Wire Line\r\n' + 
+'	7700 1100 7700 1900\r\n' + 
+'Wire Wire Line\r\n' + 
+'	7600 1100 7600 1900\r\n' + 
+'Wire Wire Line\r\n' + 
+'	7250 1100 7700 1100\r\n' + 
+'Wire Wire Line\r\n' + 
+'	7450 600  7450 1100\r\n' + 
+'Wire Wire Line\r\n' + 
+'	7250 850  7450 850 \r\n' + 
+'Connection ~ 3700 800 \r\n' + 
+'Connection ~ 3900 800 \r\n' + 
+'Connection ~ 3500 800 \r\n' + 
+'Connection ~ 3450 800 \r\n' + 
+'Wire Wire Line\r\n' + 
+'	3700 800  3700 600 \r\n' + 
+'Wire Wire Line\r\n' + 
+'	3900 800  3900 850 \r\n' + 
+'Wire Wire Line\r\n' + 
+'	3500 800  3500 850 \r\n' + 
+'Wire Wire Line\r\n' + 
+'	3400 800  3950 800 \r\n' + 
+'Wire Wire Line\r\n' + 
+'	3450 750  3450 800 \r\n' + 
+'Wire Wire Line\r\n' + 
+'	3400 750  3450 750 \r\n' + 
+'Connection ~ 6350 950 \r\n' + 
+'Connection ~ 6350 700 \r\n' + 
+'Connection ~ 6350 850 \r\n' + 
+'Wire Wire Line\r\n' + 
+'	6350 950  6250 950 \r\n' + 
+'Wire Wire Line\r\n' + 
+'	6250 700  6350 700 \r\n' + 
+'Wire Wire Line\r\n' + 
+'	6350 600  6350 1900\r\n' + 
+'Wire Wire Line\r\n' + 
+'	6350 850  6650 850 \r\n' + 
+'Connection ~ 4600 800 \r\n' + 
+'Wire Wire Line\r\n' + 
+'	4600 600  4600 850 \r\n' + 
+'Wire Wire Line\r\n' + 
+'	4550 800  4600 800 \r\n' + 
+'Wire Wire Line\r\n' + 
+'	4750 2400 4750 3000\r\n' + 
+'Wire Wire Line\r\n' + 
+'	6500 3250 6500 3300\r\n' + 
+'Connection ~ 6600 3250\r\n' + 
+'Wire Wire Line\r\n' + 
+'	6400 3250 6400 3300\r\n' + 
+'Connection ~ 6500 3250\r\n' + 
+'Connection ~ 6400 3250\r\n' + 
+'Wire Wire Line\r\n' + 
+'	6500 3500 6500 3450\r\n' + 
+'Connection ~ 6600 3500\r\n' + 
+'Wire Wire Line\r\n' + 
+'	6400 3500 6400 3450\r\n' + 
+'Connection ~ 6500 3500\r\n' + 
+'Connection ~ 6400 3500\r\n' + 
+'Wire Wire Line\r\n' + 
+'	8300 4300 8300 5200\r\n' + 
+'Wire Wire Line\r\n' + 
+'	5500 5050 5500 5650\r\n' + 
+'Connection ~ 5500 5050\r\n' + 
+'Wire Wire Line\r\n' + 
+'	5450 5000 5450 5650\r\n' + 
+'Connection ~ 5450 5000\r\n' + 
+'Wire Wire Line\r\n' + 
+'	5500 5850 5500 5900\r\n' + 
+'Wire Wire Line\r\n' + 
+'	5450 5900 5650 5900\r\n' + 
+'Wire Wire Line\r\n' + 
+'	5450 5850 5450 5900\r\n' + 
+'Connection ~ 5500 5900\r\n' + 
+'Wire Wire Line\r\n' + 
+'	8100 5050 8100 4300\r\n' + 
+'Wire Wire Line\r\n' + 
+'	8550 5400 8550 4300\r\n' + 
+'Wire Wire Line\r\n' + 
+'	4500 5200 4500 4550\r\n' + 
+'Wire Wire Line\r\n' + 
+'	4400 5300 4400 4550\r\n' + 
+'Wire Wire Line\r\n' + 
+'	4700 4550 4700 5000\r\n' + 
+'Wire Wire Line\r\n' + 
+'	4750 4950 4750 4550\r\n' + 
+'Wire Wire Line\r\n' + 
+'	3550 3900 3900 3900\r\n' + 
+'Wire Wire Line\r\n' + 
+'	3700 4050 3900 4050\r\n' + 
+'Wire Wire Line\r\n' + 
+'	4450 2200 4450 3000\r\n' + 
+'Wire Wire Line\r\n' + 
+'	4850 2750 8850 2750\r\n' + 
+'Wire Wire Line\r\n' + 
+'	3450 2450 3400 2450\r\n' + 
+'Connection ~ 3400 2450\r\n' + 
+'Wire Wire Line\r\n' + 
+'	7200 4300 7200 4850\r\n' + 
+'Wire Wire Line\r\n' + 
+'	7300 4300 7300 4950\r\n' + 
+'Wire Wire Line\r\n' + 
+'	5550 3500 5450 3500\r\n' + 
+'Wire Wire Line\r\n' + 
+'	5100 2400 4750 2400\r\n' + 
+'Wire Wire Line\r\n' + 
+'	5100 2350 5100 2400\r\n' + 
+'Wire Wire Line\r\n' + 
+'	7500 2350 5100 2350\r\n' + 
+'Wire Wire Line\r\n' + 
+'	6400 5800 6300 5800\r\n' + 
+'Wire Wire Line\r\n' + 
+'	6300 5900 6500 5900\r\n' + 
+'Wire Wire Line\r\n' + 
+'	5950 5900 6000 5900\r\n' + 
+'Wire Wire Line\r\n' + 
+'	5950 5800 6000 5800\r\n' + 
+'Connection ~ 6300 3250\r\n' + 
+'Wire Wire Line\r\n' + 
+'	7400 3250 7400 3600\r\n' + 
+'Connection ~ 3150 2300\r\n' + 
+'Wire Wire Line\r\n' + 
+'	4800 2700 8900 2700\r\n' + 
+'Wire Wire Line\r\n' + 
+'	4800 2700 4800 3000\r\n' + 
+'Wire Wire Line\r\n' + 
+'	8650 5500 8650 4300\r\n' + 
+'Wire Wire Line\r\n' + 
+'	6300 3500 6800 3500\r\n' + 
+'Wire Wire Line\r\n' + 
+'	6300 3500 6300 3450\r\n' + 
+'Wire Wire Line\r\n' + 
+'	6300 3250 7400 3250\r\n' + 
+'Wire Wire Line\r\n' + 
+'	7650 3400 7650 3300\r\n' + 
+'Wire Wire Line\r\n' + 
+'	7650 3300 7750 3300\r\n' + 
+'Connection ~ 7500 3300\r\n' + 
+'Wire Wire Line\r\n' + 
+'	2300 1350 4500 1350\r\n' + 
+'Wire Wire Line\r\n' + 
+'	2300 750  2300 950 \r\n' + 
+'Wire Wire Line\r\n' + 
+'	8400 1750 9700 1750\r\n' + 
+'Wire Wire Line\r\n' + 
+'	8450 1850 9700 1850\r\n' + 
+'Wire Wire Line\r\n' + 
+'	1500 6350 7400 6350\r\n' + 
+'Wire Wire Line\r\n' + 
+'	10700 1150 11100 1150\r\n' + 
+'Wire Wire Line\r\n' + 
+'	10700 1250 10750 1250\r\n' + 
+'Wire Wire Line\r\n' + 
+'	10750 1250 10750 1200\r\n' + 
+'Wire Wire Line\r\n' + 
+'	10750 1200 11100 1200\r\n' + 
+'Wire Wire Line\r\n' + 
+'	7250 4300 7250 4900\r\n' + 
+'Wire Wire Line\r\n' + 
+'	8100 1000 8100 3600\r\n' + 
+'Wire Wire Line\r\n' + 
+'	8300 1550 8300 3600\r\n' + 
+'Wire Wire Line\r\n' + 
+'	8350 1650 8350 3600\r\n' + 
+'Wire Wire Line\r\n' + 
+'	8400 1750 8400 3600\r\n' + 
+'Wire Wire Line\r\n' + 
+'	8450 1850 8450 3600\r\n' + 
+'Wire Wire Line\r\n' + 
+'	8250 800  10850 800 \r\n' + 
+'Wire Wire Line\r\n' + 
+'	10900 1450 10700 1450\r\n' + 
+'Wire Wire Line\r\n' + 
+'	10850 1350 10700 1350\r\n' + 
+'Wire Wire Line\r\n' + 
+'	10850 800  10850 1350\r\n' + 
+'Wire Wire Line\r\n' + 
+'	11100 1250 11050 1250\r\n' + 
+'Wire Wire Line\r\n' + 
+'	11100 1100 11050 1100\r\n' + 
+'Wire Wire Line\r\n' + 
+'	8250 800  8250 3600\r\n' + 
+'Wire Wire Line\r\n' + 
+'	8200 750  8200 3600\r\n' + 
+'Wire Wire Line\r\n' + 
+'	8200 750  10900 750 \r\n' + 
+'Wire Wire Line\r\n' + 
+'	10900 750  10900 1450\r\n' + 
+'Wire Wire Line\r\n' + 
+'	6300 3250 6300 3300\r\n' + 
+'Wire Wire Line\r\n' + 
+'	7500 3000 7500 3600\r\n' + 
+'Wire Wire Line\r\n' + 
+'	6800 3000 7500 3000\r\n' + 
+'Connection ~ 6900 3000\r\n' + 
+'Wire Wire Line\r\n' + 
+'	6650 3000 6600 3000\r\n' + 
+'Wire Wire Line\r\n' + 
+'	8900 2700 8900 3600\r\n' + 
+'Wire Wire Line\r\n' + 
+'	8850 2750 8850 3600\r\n' + 
+'Wire Wire Line\r\n' + 
+'	8800 2800 8800 3600\r\n' + 
+'Wire Wire Line\r\n' + 
+'	8750 2850 8750 3600\r\n' + 
+'Wire Wire Line\r\n' + 
+'	8700 2900 8700 3600\r\n' + 
+'Wire Wire Line\r\n' + 
+'	8650 2950 8650 3600\r\n' + 
+'Wire Wire Line\r\n' + 
+'	6850 3950 6850 3500\r\n' + 
+'Wire Wire Line\r\n' + 
+'	6850 3500 8600 3500\r\n' + 
+'Wire Wire Line\r\n' + 
+'	8600 3500 8600 3600\r\n' + 
+'Wire Wire Line\r\n' + 
+'	8550 3550 8550 3600\r\n' + 
+'Wire Wire Line\r\n' + 
+'	6900 3550 8550 3550\r\n' + 
+'Wire Wire Line\r\n' + 
+'	6900 4000 6900 3550\r\n' + 
+'Wire Wire Line\r\n' + 
+'	7650 3400 7600 3400\r\n' + 
+'Wire Wire Line\r\n' + 
+'	7600 3400 7600 3600\r\n' + 
+'Wire Wire Line\r\n' + 
+'	8150 750  8150 3600\r\n' + 
+'Wire Wire Line\r\n' + 
+'	4400 1100 5750 1100\r\n' + 
+'Wire Wire Line\r\n' + 
+'	5750 1100 5750 1250\r\n' + 
+'Wire Wire Line\r\n' + 
+'	4950 4600 4950 4550\r\n' + 
+'Connection ~ 4950 4600\r\n' + 
+'Wire Wire Line\r\n' + 
+'	5500 4050 5450 4050\r\n' + 
+'Connection ~ 5500 4050\r\n' + 
+'Wire Wire Line\r\n' + 
+'	7250 4900 4800 4900\r\n' + 
+'Wire Wire Line\r\n' + 
+'	7300 4950 4750 4950\r\n' + 
+'$Comp\r\n' + 
+'L PWR_FLAG #PWR04\r\n' + 
+'U 1 1 53C67B8D\r\n' + 
+'P 9800 2600\r\n' + 
+'F 0 "#PWR04" H 9800 2870 30  0001 C CNN\r\n' + 
+'F 1 "PWR_FLAG" H 9800 2830 30  0000 C CNN\r\n' + 
+'F 2 "" H 9800 2600 60  0000 C CNN\r\n' + 
+'F 3 "" H 9800 2600 60  0000 C CNN\r\n' + 
+'	1    9800 2600\r\n' + 
+'	1    0    0    -1  \r\n' + 
+'$EndComp\r\n' + 
+'$Comp\r\n' + 
+'L GND #PWR37\r\n' + 
+'U 1 1 53C67BB1\r\n' + 
+'P 9800 2650\r\n' + 
+'F 0 "#PWR37" H 9800 2650 30  0001 L BNN\r\n' + 
+'F 1 "GND" H 9752 2570 30  0000 L BNN\r\n' + 
+'F 2 "GND" H 9800 2650 60  0000 C CNN\r\n' + 
+'F 3 "" H 9800 2650 60  0000 C CNN\r\n' + 
+'	1    9800 2650\r\n' + 
+'	1    0    0    -1  \r\n' + 
+'$EndComp\r\n' + 
+'Wire Wire Line\r\n' + 
+'	9800 2650 9800 2600\r\n' + 
+'$Comp\r\n' + 
+'L LED_B L2\r\n' + 
+'U 1 1 53C75323\r\n' + 
+'P 10550 4500\r\n' + 
+'F 0 "L2" V 10600 4400 30  0000 L BNN\r\n' + 
+'F 1 "LED_G" V 10540 4506 30  0001 L BNN\r\n' + 
+'F 2 "" H 10550 4500 60  0000 C CNN\r\n' + 
+'F 3 "" H 10550 4500 60  0000 C CNN\r\n' + 
+'	1    10550 4500\r\n' + 
+'	0    1    1    0   \r\n' + 
+'$EndComp\r\n' + 
+'$Comp\r\n' + 
+'L LED_B L3\r\n' + 
+'U 1 1 53C75364\r\n' + 
+'P 10550 4650\r\n' + 
+'F 0 "L3" V 10600 4550 30  0000 L BNN\r\n' + 
+'F 1 "LED_R" V 10540 4656 30  0001 L BNN\r\n' + 
+'F 2 "" H 10550 4650 60  0000 C CNN\r\n' + 
+'F 3 "" H 10550 4650 60  0000 C CNN\r\n' + 
+'	1    10550 4650\r\n' + 
+'	0    1    1    0   \r\n' + 
+'$EndComp\r\n' + 
+'Wire Wire Line\r\n' + 
+'	5350 1350 5350 1300\r\n' + 
+'Wire Wire Line\r\n' + 
+'	5800 4450 5800 4400\r\n' + 
+'Wire Wire Line\r\n' + 
+'	3350 2350 3500 2350\r\n' + 
+'Wire Wire Line\r\n' + 
+'	3350 2350 3350 2400\r\n' + 
+'Wire Wire Line\r\n' + 
+'	3500 2400 3450 2400\r\n' + 
+'Wire Wire Line\r\n' + 
+'	3450 2400 3450 2450\r\n' + 
+'$EndSCHEMATC';
+
+var stereo_camera_board = 'EESchema-LIBRARY Version 2.3  Date: 7/21/2014 9:51:47 PM\r\n' + 
+'#encoding utf-8\r\n' + 
+'#\r\n' + 
+'# +2.5V\r\n' + 
+'#\r\n' + 
+'DEF +2.5V P+ 0 1 N N 1 L N\r\n' + 
+'F0 "P+" 0 0 50 V I L BNN\r\n' + 
+'F1 "+2.5V" 50 0 30 V V L BNN\r\n' + 
+'F2 "" 0 0 60 H V C CNN\r\n' + 
+'F3 "" 0 0 60 H V C CNN\r\n' + 
+'DRAW\r\n' + 
+'P 2 1 0 0  0 0  0 25 N\r\n' + 
+'P 2 1 0 0  0 25  -19 -7 N\r\n' + 
+'P 2 1 0 0  19 -7  0 25 N\r\n' + 
+'X +2.5V ~ 0 0 0 U 28 28 1 1 W N\r\n' + 
+'ENDDRAW\r\n' + 
+'ENDDEF\r\n' + 
+'#\r\n' + 
+'# +3.3V\r\n' + 
+'#\r\n' + 
+'DEF +3.3V P+ 0 1 N N 1 L N\r\n' + 
+'F0 "P+" 0 0 50 V I L BNN\r\n' + 
+'F1 "+3.3V" 50 0 30 V V L BNN\r\n' + 
+'F2 "" 0 0 60 H V C CNN\r\n' + 
+'F3 "" 0 0 60 H V C CNN\r\n' + 
+'DRAW\r\n' + 
+'P 2 1 0 0  0 0  0 25 N\r\n' + 
+'P 2 1 0 0  0 25  -19 -7 N\r\n' + 
+'P 2 1 0 0  19 -7  0 25 N\r\n' + 
+'X +3.3V ~ 0 0 0 U 28 28 1 1 W N\r\n' + 
+'ENDDRAW\r\n' + 
+'ENDDEF\r\n' + 
+'#\r\n' + 
+'# +5V\r\n' + 
+'#\r\n' + 
+'DEF +5V P+ 0 1 N N 1 L N\r\n' + 
+'F0 "P+" 0 0 50 V I L BNN\r\n' + 
+'F1 "+5V" 50 0 30 V V L BNN\r\n' + 
+'F2 "" 0 0 60 H V C CNN\r\n' + 
+'F3 "" 0 0 60 H V C CNN\r\n' + 
+'DRAW\r\n' + 
+'P 2 1 0 0  0 0  0 25 N\r\n' + 
+'P 2 1 0 0  0 25  -19 -7 N\r\n' + 
+'P 2 1 0 0  19 -7  0 25 N\r\n' + 
+'X +5V ~ 0 0 0 U 28 28 1 1 W N\r\n' + 
+'ENDDRAW\r\n' + 
+'ENDDEF\r\n' + 
+'#\r\n' + 
+'# -NPN-TO92\r\n' + 
+'#\r\n' + 
+'DEF -NPN-TO92 T 0 40 Y Y 1 L N\r\n' + 
+'F0 "T" -400 300 50 H V L BNN\r\n' + 
+'F1 "-NPN-TO92" -400 200 50 H V L BNN\r\n' + 
+'F2 "transistor-TO92" 0 150 50 H I C CNN\r\n' + 
+'F3 "" 0 0 60 H V C CNN\r\n' + 
+'DRAW\r\n' + 
+'P 2 1 0 0  50 -100  70 -60 N\r\n' + 
+'P 2 1 0 0  60 -95  90 -95 N\r\n' + 
+'P 2 1 0 0  60 -90  75 -90 N\r\n' + 
+'P 2 1 0 0  60 -80  12 -56 N\r\n' + 
+'P 2 1 0 0  70 -70  60 -90 N\r\n' + 
+'P 2 1 0 0  70 -60  100 -100 N\r\n' + 
+'P 2 1 0 0  75 -90  70 -80 N\r\n' + 
+'P 2 1 0 0  90 -95  70 -70 N\r\n' + 
+'P 2 1 0 0  100 -100  50 -100 N\r\n' + 
+'P 2 1 0 0  100 100  20 60 N\r\n' + 
+'S -10 -100 20 100 1 1 0 F\r\n' + 
+'X E 1 100 -200 100 U 40 40 1 1 P\r\n' + 
+'X B 2 -100 0 100 R 40 40 1 1 P\r\n' + 
+'X C 3 100 200 100 D 40 40 1 1 P\r\n' + 
+'ENDDRAW\r\n' + 
+'ENDDEF\r\n' + 
+'#\r\n' + 
+'# 2N2907A-PNP-TO18-EBC\r\n' + 
+'#\r\n' + 
+'DEF 2N2907A-PNP-TO18-EBC T 0 40 Y Y 1 L N\r\n' + 
+'F0 "T" -400 300 50 H V L BNN\r\n' + 
+'F1 "2N2907A-PNP-TO18-EBC" -400 200 50 H V L BNN\r\n' + 
+'F2 "transistor-TO18" 0 150 50 H I C CNN\r\n' + 
+'F3 "" 0 0 60 H V C CNN\r\n' + 
+'DRAW\r\n' + 
+'P 2 1 0 0  20 58  82 66 N\r\n' + 
+'P 2 1 0 0  30 65  70 70 N\r\n' + 
+'P 2 1 0 0  45 75  60 75 N\r\n' + 
+'P 2 1 0 0  60 85  45 75 N\r\n' + 
+'P 2 1 0 0  60 95  30 65 N\r\n' + 
+'P 2 1 0 0  62 102  20 58 N\r\n' + 
+'P 2 1 0 0  70 70  60 85 N\r\n' + 
+'P 2 1 0 0  75 70  60 95 N\r\n' + 
+'P 2 1 0 0  82 66  62 102 N\r\n' + 
+'P 2 1 0 0  100 -100  20 -60 N\r\n' + 
+'P 2 1 0 0  100 100  71 83 N\r\n' + 
+'S -10 -100 20 100 1 1 0 F\r\n' + 
+'X E 1 100 200 100 D 40 40 1 1 P\r\n' + 
+'X B 2 -100 0 100 R 40 40 1 1 P\r\n' + 
+'X C 3 100 -200 100 U 40 40 1 1 P\r\n' + 
+'ENDDRAW\r\n' + 
+'ENDDEF\r\n' + 
+'#\r\n' + 
+'# AVR-JTAG-10\r\n' + 
+'#\r\n' + 
+'DEF AVR-JTAG-10 JP 0 40 Y Y 1 L N\r\n' + 
+'F0 "JP" -250 350 50 H V L BNN\r\n' + 
+'F1 "AVR-JTAG-10" 0 0 50 H V L BNN\r\n' + 
+'F2 "atmel-AVR-JTAG-10" 0 150 50 H I C CNN\r\n' + 
+'F3 "" 0 0 60 H V C CNN\r\n' + 
+'DRAW\r\n' + 
+'T 0 -383 -152 45 0 1 0 GND  Normal 1 C C\r\n' + 
+'T 0 -383 -52 45 0 1 0 GND  Normal 1 C C\r\n' + 
+'T 0 -110 -390 70 0 1 0 JTAG  Normal 1 C C\r\n' + 
+'T 0 -360 147 45 0 1 0 SRST  Normal 1 C C\r\n' + 
+'T 0 367 -152 45 0 1 0 TCK  Normal 1 C C\r\n' + 
+'T 0 367 147 45 0 1 0 TDI  Normal 1 C C\r\n' + 
+'T 0 367 47 45 0 1 0 TDO  Normal 1 C C\r\n' + 
+'T 0 367 -52 45 0 1 0 TMS  Normal 1 C C\r\n' + 
+'T 0 -360 47 45 0 1 0 TRST  Normal 1 C C\r\n' + 
+'T 0 367 247 45 0 1 0 VCC  Normal 1 C C\r\n' + 
+'T 0 -360 247 45 0 1 0 VREF  Normal 1 C C\r\n' + 
+'P 2 1 0 0  -250 -300  250 -300 N\r\n' + 
+'P 2 1 0 0  -250 300  -250 -300 N\r\n' + 
+'P 2 1 0 0  -75 -200  -50 -200 N\r\n' + 
+'P 2 1 0 0  -75 -100  -50 -100 N\r\n' + 
+'P 2 1 0 0  -75 0  -50 0 N\r\n' + 
+'P 2 1 0 0  -75 100  -50 100 N\r\n' + 
+'P 2 1 0 0  -75 200  -50 200 N\r\n' + 
+'P 2 1 0 0  50 -200  75 -200 N\r\n' + 
+'P 2 1 0 0  50 -100  75 -100 N\r\n' + 
+'P 2 1 0 0  50 0  75 0 N\r\n' + 
+'P 2 1 0 0  50 100  75 100 N\r\n' + 
+'P 2 1 0 0  50 200  75 200 N\r\n' + 
+'P 2 1 0 0  250 -300  250 300 N\r\n' + 
+'P 2 1 0 0  250 300  -250 300 N\r\n' + 
+'X 1 1 200 -200 100 L 40 40 1 1 P\r\n' + 
+'X 2 2 -200 -100 100 R 40 40 1 1 P\r\n' + 
+'X 3 3 200 0 100 L 40 40 1 1 P\r\n' + 
+'X 4 4 -200 200 100 R 40 40 1 1 P\r\n' + 
+'X 5 5 200 -100 100 L 40 40 1 1 P\r\n' + 
+'X 6 6 -200 100 100 R 40 40 1 1 P\r\n' + 
+'X 7 7 200 200 100 L 40 40 1 1 P\r\n' + 
+'X 8 8 -200 0 100 R 40 40 1 1 P\r\n' + 
+'X 9 9 200 100 100 L 40 40 1 1 P\r\n' + 
+'X 10 10 -200 -200 100 R 40 40 1 1 P\r\n' + 
+'ENDDRAW\r\n' + 
+'ENDDEF\r\n' + 
+'#\r\n' + 
+'# BEAD\r\n' + 
+'#\r\n' + 
+'DEF BEAD ?? 0 40 Y Y 1 L N\r\n' + 
+'F0 "??" 0 0 60 H V C CNN\r\n' + 
+'F1 "BEAD" 0 0 60 H V C CNN\r\n' + 
+'F2 "" 0 0 60 H V C CNN\r\n' + 
+'F3 "" 0 0 60 H V C CNN\r\n' + 
+'DRAW\r\n' + 
+'A 0 -75 25 901 1799 1 1 0 N 0 -50 -25 -75\r\n' + 
+'A 0 -75 25 -1799 -901 1 1 0 N -25 -75 0 -100\r\n' + 
+'A 0 -25 25 901 1799 1 1 0 N 0 0 -25 -25\r\n' + 
+'A 0 -25 25 -1799 -901 1 1 0 N -25 -25 0 -50\r\n' + 
+'A 0 25 25 901 1799 1 1 0 N 0 50 -25 25\r\n' + 
+'A 0 25 25 -1799 -901 1 1 0 N -25 25 0 0\r\n' + 
+'A 0 75 25 901 1799 1 1 0 N 0 100 -25 75\r\n' + 
+'A 0 75 25 -1799 -901 1 1 0 N -25 75 0 50\r\n' + 
+'X P$1 1 0 150 50 D 40 40 1 1 P\r\n' + 
+'X 2 2 0 -150 50 U 40 40 1 1 P\r\n' + 
+'ENDDRAW\r\n' + 
+'ENDDEF\r\n' + 
+'#\r\n' + 
+'# C_CPOL\r\n' + 
+'#\r\n' + 
+'DEF C_CPOL ?? 0 1 N N 1 L N\r\n' + 
+'F0 "??" 0 0 60 H V C CNN\r\n' + 
+'F1 "C_CPOL" 0 100 60 H V C CNN\r\n' + 
+'F2 "" 0 0 60 H V C CNN\r\n' + 
+'F3 "" 0 0 60 H V C CNN\r\n' + 
+'DRAW\r\n' + 
+'T 900 -23 32 11 0 1 0 +  Normal 0 L B\r\n' + 
+'P 2 1 0 0  -29 -17  29 -17 N\r\n' + 
+'P 2 1 0 0  -29 0  -29 -17 N\r\n' + 
+'P 2 1 0 0  -29 0  29 0 N\r\n' + 
+'P 2 1 0 0  29 -17  29 0 N\r\n' + 
+'S -41 -64 41 -41 1 1 0 F\r\n' + 
+'X 1 1 0 50 100 D 28 28 1 1 P\r\n' + 
+'X 2 2 0 -100 100 U 28 28 1 1 P\r\n' + 
+'ENDDRAW\r\n' + 
+'ENDDEF\r\n' + 
+'#\r\n' + 
+'# FERRITE\r\n' + 
+'#\r\n' + 
+'DEF FERRITE FB 0 1 N N 1 L N\r\n' + 
+'F0 "FB" 100 50 30 H V R TNN\r\n' + 
+'F1 "FERRITE" 0 50 30 H V R TNN\r\n' + 
+'F2 "dan-rcl-0402" 0 150 50 H I C CNN\r\n' + 
+'F3 "" 0 0 60 H V C CNN\r\n' + 
+'DRAW\r\n' + 
+'P 2 1 0 0  0 0  9 0 N\r\n' + 
+'P 2 1 0 0  0 19  9 0 N\r\n' + 
+'P 2 1 0 0  9 0  19 -19 N\r\n' + 
+'P 2 1 0 0  19 -19  50 -19 N\r\n' + 
+'P 2 1 0 0  29 19  0 19 N\r\n' + 
+'P 2 1 0 0  39 0  29 19 N\r\n' + 
+'P 2 1 0 0  50 -19  39 0 N\r\n' + 
+'P 2 1 0 0  50 0  39 0 N\r\n' + 
+'X 1 1 -50 0 100 R 28 28 1 1 P\r\n' + 
+'X 2 2 100 0 100 L 28 28 1 1 P\r\n' + 
+'ENDDRAW\r\n' + 
+'ENDDEF\r\n' + 
+'#\r\n' + 
+'# FSM4JSMA-SMD\r\n' + 
+'#\r\n' + 
+'DEF FSM4JSMA-SMD P 0 40 Y Y 1 L N\r\n' + 
+'F0 "P" -260 -75 50 V V L BNN\r\n' + 
+'F1 "FSM4JSMA-SMD" -160 100 50 V V L BNN\r\n' + 
+'F2 "switch-misc-FSM4JSMA-SMD" 0 150 50 H I C CNN\r\n' + 
+'F3 "" 0 0 60 H V C CNN\r\n' + 
+'DRAW\r\n' + 
+'P 2 1 0 0  -200 -75  -150 -75 N\r\n' + 
+'P 2 1 0 0  -200 0  -200 -75 N\r\n' + 
+'P 2 1 0 0  -200 0  -125 0 N\r\n' + 
+'P 2 1 0 0  -200 75  -200 0 N\r\n' + 
+'P 2 1 0 0  -200 75  -150 75 N\r\n' + 
+'P 2 1 0 0  -100 0  -75 0 N\r\n' + 
+'P 2 1 0 0  -50 0  -25 0 N\r\n' + 
+'P 2 1 0 0  0 -100  -40 80 N\r\n' + 
+'P 2 1 0 0  0 80  0 100 N\r\n' + 
+'P 2 1 0 0  100 -100  0 -100 N\r\n' + 
+'P 2 1 0 0  100 100  0 100 N\r\n' + 
+'C 0 -100 5 1 1 0 F\r\n' + 
+'C 0 100 5 1 1 0 F\r\n' + 
+'X P P$1 0 -200 100 U 40 40 1 1 P\r\n' + 
+'X P@1 P$2 100 -200 100 U 40 40 1 1 P\r\n' + 
+'X S P$3 0 200 100 D 40 40 1 1 P\r\n' + 
+'X S@1 P$4 100 200 100 D 40 40 1 1 P\r\n' + 
+'ENDDRAW\r\n' + 
+'ENDDEF\r\n' + 
+'#\r\n' + 
+'# GND\r\n' + 
+'#\r\n' + 
+'DEF GND SUPPLY 0 1 N N 1 L N\r\n' + 
+'F0 "SUPPLY" 0 0 30 H I L BNN\r\n' + 
+'F1 "GND" -48 -80 30 H V L BNN\r\n' + 
+'F2 "" 0 0 60 H V C CNN\r\n' + 
+'F3 "" 0 0 60 H V C CNN\r\n' + 
+'DRAW\r\n' + 
+'P 2 1 0 0  -25 0  25 0 N\r\n' + 
+'P 2 1 0 0  0 -25  -25 0 N\r\n' + 
+'P 2 1 0 0  25 0  0 -25 N\r\n' + 
+'X GND ~ 0 0 0 D 28 28 1 1 W N\r\n' + 
+'ENDDRAW\r\n' + 
+'ENDDEF\r\n' + 
+'#\r\n' + 
+'# GSB311231HR\r\n' + 
+'#\r\n' + 
+'DEF GSB311231HR U 0 1 N Y 1 L N\r\n' + 
+'F0 "U" 200 300 50 H V L BNN\r\n' + 
+'F1 "GSB311231HR" -450 350 50 H V L BNN\r\n' + 
+'F2 "USB Stacked" 175 25 50 V I C CNN\r\n' + 
+'F3 "" 25 25 60 V V C CNN\r\n' + 
+'DRAW\r\n' + 
+'T 900 -205 225 40 0 0 0 TOP  Normal 0 C C\r\n' + 
+'P 2 1 0 0  -300 250  -300 -250 N\r\n' + 
+'P 2 1 0 0  300 300  -300 300 N\r\n' + 
+'P 2 1 0 0  350 -300  -300 -300 N\r\n' + 
+'P 2 1 0 0  350 -250  350 250 N\r\n' + 
+'S -300 -250 -300 -300 0 1 0 N\r\n' + 
+'S -300 300 -300 250 0 1 0 N\r\n' + 
+'S -125 275 -25 275 0 1 0 N\r\n' + 
+'S -25 275 -25 -225 0 1 0 N\r\n' + 
+'S 75 -225 75 275 0 1 0 N\r\n' + 
+'S 225 275 75 275 0 1 0 N\r\n' + 
+'S 225 275 225 -225 0 1 0 N\r\n' + 
+'S 350 -250 350 -300 0 1 0 N\r\n' + 
+'S 350 300 350 250 0 1 0 N\r\n' + 
+'P 2 0 1 0  -175 -275  -25 -275 N\r\n' + 
+'P 2 0 1 0  -175 275  -175 -275 N\r\n' + 
+'P 2 0 1 0  -125 -175  -125 -225 N\r\n' + 
+'P 2 0 1 0  -125 -75  -125 -125 N\r\n' + 
+'P 2 0 1 0  -125 25  -125 -25 N\r\n' + 
+'P 2 0 1 0  -125 125  -125 75 N\r\n' + 
+'P 2 0 1 0  -125 225  -125 175 N\r\n' + 
+'P 2 0 1 0  -125 275  -175 275 N\r\n' + 
+'P 2 0 1 0  -75 -125  -75 -175 N\r\n' + 
+'P 2 0 1 0  -75 -25  -75 -75 N\r\n' + 
+'P 2 0 1 0  -75 75  -75 25 N\r\n' + 
+'P 2 0 1 0  -75 175  -75 125 N\r\n' + 
+'P 2 0 1 0  -25 -275  -25 -225 N\r\n' + 
+'P 2 0 1 0  75 -225  75 -275 N\r\n' + 
+'P 2 0 1 0  125 -175  125 -225 N\r\n' + 
+'P 2 0 1 0  125 -75  125 -125 N\r\n' + 
+'P 2 0 1 0  125 25  125 -25 N\r\n' + 
+'P 2 0 1 0  125 125  125 75 N\r\n' + 
+'P 2 0 1 0  125 225  125 175 N\r\n' + 
+'P 2 0 1 0  175 -125  175 -175 N\r\n' + 
+'P 2 0 1 0  175 -25  175 -75 N\r\n' + 
+'P 2 0 1 0  175 75  175 25 N\r\n' + 
+'P 2 0 1 0  175 175  175 125 N\r\n' + 
+'P 2 0 1 0  225 -275  75 -275 N\r\n' + 
+'P 2 0 1 0  225 -225  225 -275 N\r\n' + 
+'P 2 0 1 0  300 300  350 300 N\r\n' + 
+'X 5+ 1 450 200 100 L 50 30 1 1 W\r\n' + 
+'X D- 2 450 150 100 L 50 30 1 1 P\r\n' + 
+'X D+ 3 450 100 100 L 50 30 1 1 P\r\n' + 
+'X GND 4 450 50 100 L 50 30 1 1 W\r\n' + 
+'X SSTX- 5 450 0 100 L 50 30 1 1 P\r\n' + 
+'X SSTX+ 6 450 -50 100 L 50 30 1 1 P\r\n' + 
+'X SHIELD 7 450 -100 100 L 50 30 1 1 P\r\n' + 
+'X SSRX- 8 450 -150 100 L 50 30 1 1 P\r\n' + 
+'X SSRX+ 9 450 -200 100 L 50 30 1 1 P\r\n' + 
+'X 5+ 10 -400 200 100 R 50 30 1 1 w\r\n' + 
+'X D- 11 -400 150 100 R 50 30 1 1 P\r\n' + 
+'X D+ 12 -400 100 100 R 50 30 1 1 P\r\n' + 
+'X GND 13 -400 50 100 R 50 30 1 1 W\r\n' + 
+'X SSTX- 14 -400 0 100 R 50 30 1 1 P\r\n' + 
+'X SSTX+ 15 -400 -50 100 R 50 30 1 1 P\r\n' + 
+'X SHIELD 16 -400 -100 100 R 50 30 1 1 P\r\n' + 
+'X SSRX- 17 -400 -150 100 R 50 30 1 1 P\r\n' + 
+'X SSRX+ 18 -400 -200 100 R 50 30 1 1 P\r\n' + 
+'ENDDRAW\r\n' + 
+'ENDDEF\r\n' + 
+'#\r\n' + 
+'# LED_B\r\n' + 
+'#\r\n' + 
+'DEF ~LED_B BLUE_LED 0 1 N N 1 L N\r\n' + 
+'F0 "BLUE_LED" 50 -150 30 V V L BNN\r\n' + 
+'F1 "LED_B" -10 6 30 V I L BNN\r\n' + 
+'F2 "" 0 0 60 H V C CNN\r\n' + 
+'F3 "" 0 0 60 H V C CNN\r\n' + 
+'DRAW\r\n' + 
+'P 2 1 0 0  -39 -14  -67 -42 N\r\n' + 
+'P 2 1 0 0  -37 -37  -64 -64 N\r\n' + 
+'P 2 1 0 0  0 -50  -25 -50 N\r\n' + 
+'P 2 1 0 0  0 -50  -25 0 N\r\n' + 
+'P 2 1 0 0  25 -50  0 -50 N\r\n' + 
+'P 2 1 0 0  25 0  -25 0 N\r\n' + 
+'P 2 1 0 0  25 0  0 -50 N\r\n' + 
+'P 6 1 1 0  -67 -42  -59 -25  -59 -25  -50 -34  -50 -34  -67 -42 F\r\n' + 
+'P 6 1 1 0  -64 -64  -57 -46  -57 -46  -46 -57  -46 -57  -64 -64 F\r\n' + 
+'X A 1 0 50 100 D 28 28 1 1 P\r\n' + 
+'X C 2 0 -100 100 U 28 28 1 1 P\r\n' + 
+'ENDDRAW\r\n' + 
+'ENDDEF\r\n' + 
+'#\r\n' + 
+'# MAX3207E\r\n' + 
+'#\r\n' + 
+'DEF MAX3207E U 0 40 Y Y 1 F N\r\n' + 
+'F0 "U" -150 300 60 H V C CNN\r\n' + 
+'F1 "MAX3207E" 0 400 60 H V C CNN\r\n' + 
+'F2 "" 0 0 60 H V C CNN\r\n' + 
+'F3 "" 0 0 60 H V C CNN\r\n' + 
+'DRAW\r\n' + 
+'S -250 250 250 -250 0 1 0 N\r\n' + 
+'S 250 -250 250 -250 0 1 0 N\r\n' + 
+'X I/O1 1 -400 200 150 R 50 50 1 1 I\r\n' + 
+'X GND 2 -400 0 150 R 50 50 1 1 I\r\n' + 
+'X N.C 3 -400 -200 150 R 50 50 1 1 I\r\n' + 
+'X I/02 4 400 -200 150 L 50 50 1 1 I\r\n' + 
+'X Vcc 5 400 0 150 L 50 50 1 1 I\r\n' + 
+'X N.C 6 400 200 150 L 50 50 1 1 I\r\n' + 
+'ENDDRAW\r\n' + 
+'ENDDEF\r\n' + 
+'#\r\n' + 
+'# MPU-9250\r\n' + 
+'#\r\n' + 
+'DEF MPU-9250 U 0 40 Y Y 1 F N\r\n' + 
+'F0 "U" -300 450 60 H V C CNN\r\n' + 
+'F1 "MPU-9250" 0 50 60 H V C CNN\r\n' + 
+'F2 "" 0 0 60 H V C CNN\r\n' + 
+'F3 "" 0 0 60 H V C CNN\r\n' + 
+'DRAW\r\n' + 
+'S -400 400 400 -400 0 1 0 N\r\n' + 
+'X RESV? 1 150 -500 100 U 50 30 1 1 P\r\n' + 
+'X AUX_CL 7 500 250 100 L 50 30 1 1 B\r\n' + 
+'X VDDIO 8 -500 250 100 R 50 30 1 1 W\r\n' + 
+'X AD0/SDO 9 -500 -150 100 R 50 30 1 1 B\r\n' + 
+'X REGOUT 10 500 -250 100 L 50 30 1 1 P\r\n' + 
+'X RESV 20 500 -150 100 L 50 30 1 1 P\r\n' + 
+'X FSYNC 11 500 150 100 L 50 30 1 1 B\r\n' + 
+'X AUX_DA 21 500 350 100 L 50 30 1 1 B\r\n' + 
+'X INT 12 500 50 100 L 50 30 1 1 B\r\n' + 
+'X nCS 22 -500 -50 100 R 50 30 1 1 B\r\n' + 
+'X VDD 13 -500 350 100 R 50 30 1 1 W\r\n' + 
+'X SCL/SCLK 23 -500 -350 100 R 50 30 1 1 B\r\n' + 
+'X SDA/SDI 24 -500 -250 100 R 50 30 1 1 B\r\n' + 
+'X GND 18 500 -350 100 L 50 30 1 1 W\r\n' + 
+'X RESV? 19 50 -500 100 U 50 30 1 1 P\r\n' + 
+'ENDDRAW\r\n' + 
+'ENDDEF\r\n' + 
+'#\r\n' + 
+'# MT9V032\r\n' + 
+'#\r\n' + 
+'DEF MT9V032 IC 0 1 N Y 1 L N\r\n' + 
+'F0 "IC" -768 704 50 H V L BNN\r\n' + 
+'F1 "MT9V032" -768 640 50 H V L BNN\r\n' + 
+'F2 "dan-aptina-CLCC48-MT9V032" 0 150 50 H I C CNN\r\n' + 
+'F3 "" 25 25 60 V V C CNN\r\n' + 
+'DRAW\r\n' + 
+'P 2 1 0 0  -650 -650  -650 600 N\r\n' + 
+'P 2 1 0 0  -650 600  -600 650 N\r\n' + 
+'P 2 1 0 0  -600 -700  -650 -650 N\r\n' + 
+'P 2 1 0 0  -600 650  -25 650 N\r\n' + 
+'P 2 1 0 0  -200 -200  250 -200 N\r\n' + 
+'P 2 1 0 0  -200 150  -200 -200 N\r\n' + 
+'P 2 1 0 0  -25 650  25 650 N\r\n' + 
+'P 2 1 0 0  25 650  650 650 N\r\n' + 
+'P 2 1 0 0  250 -200  250 150 N\r\n' + 
+'P 2 1 0 0  250 150  -200 150 N\r\n' + 
+'P 2 1 0 0  250 150  225 125 N\r\n' + 
+'P 2 1 0 0  250 150  225 175 N\r\n' + 
+'P 2 1 0 0  250 150  275 125 N\r\n' + 
+'P 2 1 0 0  250 150  275 175 N\r\n' + 
+'P 2 1 0 0  650 -700  -600 -700 N\r\n' + 
+'P 2 1 0 0  650 650  700 600 N\r\n' + 
+'P 2 1 0 0  700 -650  650 -700 N\r\n' + 
+'P 2 1 0 0  700 600  700 -650 N\r\n' + 
+'A 0 650 25 -1799 -1 1 1 0 N -25 650 25 650\r\n' + 
+'X VDD@1 1 0 750 200 D 28 28 1 1 W\r\n' + 
+'X SHFT_CLKOUT_N 2 -50 750 200 D 28 28 1 1 O\r\n' + 
+'X SHFT_CLKOUT_P 3 -100 750 200 D 28 28 1 1 O\r\n' + 
+'X SER_DATAOUT_N 4 -150 750 200 D 28 28 1 1 O\r\n' + 
+'X SER_DATAOUT_P 5 -200 750 200 D 28 28 1 1 O\r\n' + 
+'X VDDLVDS@6 6 -250 750 200 D 28 28 1 1 P\r\n' + 
+'X LVDSGND@7 7 -750 250 200 R 28 28 1 1 P\r\n' + 
+'X BYPASS_CLKIN_N 8 -750 200 200 R 28 28 1 1 I\r\n' + 
+'X BYPASS_CLKIN_P 9 -750 150 200 R 28 28 1 1 I\r\n' + 
+'X SER_DATAIN_N 10 -750 100 200 R 28 28 1 1 I\r\n' + 
+'X LINE_VALID 20 -200 -800 200 U 28 28 1 1 O\r\n' + 
+'X S_CTRL_ADR0 30 300 -800 200 U 28 28 1 1 I\r\n' + 
+'X VAAPIX@40 40 800 150 200 L 28 28 1 1 P\r\n' + 
+'X SER_DATAIN_P 11 -750 50 200 R 28 28 1 1 I\r\n' + 
+'X FRAME_VALID 21 -150 -800 200 U 28 28 1 1 O\r\n' + 
+'X S_CTRL_ADR1 31 800 -300 200 L 28 28 1 1 I\r\n' + 
+'X DOUT4 41 800 200 200 L 28 28 1 1 O\r\n' + 
+'X LVDSGND@12 12 -750 0 200 R 28 28 1 1 P\r\n' + 
+'X STLN_OUT 22 -100 -800 200 U 28 28 1 1 B\r\n' + 
+'X !RESET 32 800 -250 200 L 28 28 1 1 I\r\n' + 
+'X DOUT3 42 800 250 200 L 28 28 1 1 O\r\n' + 
+'X DGND@13 13 -750 -50 200 R 28 28 1 1 P\r\n' + 
+'X EXPOSURE 23 -50 -800 200 U 28 28 1 1 I\r\n' + 
+'X STANDBY 33 800 -200 200 L 28 28 1 1 I\r\n' + 
+'X DOUT2 43 300 750 200 D 28 28 1 1 O\r\n' + 
+'X VDD@14 14 -750 -100 200 R 28 28 1 1 P\r\n' + 
+'X SDATA 24 0 -800 200 U 28 28 1 1 B\r\n' + 
+'X AGND@34 34 800 -150 200 L 28 28 1 1 P\r\n' + 
+'X DOUT1 44 250 750 200 D 28 28 1 1 O\r\n' + 
+'X DOUT5 15 -750 -150 200 R 28 28 1 1 O\r\n' + 
+'X SCLK 25 50 -800 200 U 28 28 1 1 I\r\n' + 
+'X VAA@35 35 800 -100 200 L 28 28 1 1 P\r\n' + 
+'X DOUT0 45 200 750 200 D 28 28 1 1 O\r\n' + 
+'X DOUT6 16 -750 -200 200 R 28 28 1 1 O\r\n' + 
+'X STFRM_OUT 26 100 -800 200 U 28 28 1 1 B\r\n' + 
+'X NC@36 36 800 -50 200 L 28 28 1 1 B\r\n' + 
+'X PIXCLK 46 150 750 200 D 28 28 1 1 O\r\n' + 
+'X DOUT7 17 -750 -250 200 R 28 28 1 1 O\r\n' + 
+'X LED_OUT 27 150 -800 200 U 28 28 1 1 B\r\n' + 
+'X NC@37 37 800 0 200 L 28 28 1 1 B\r\n' + 
+'X SYSCLK 47 100 750 200 D 28 28 1 1 I C\r\n' + 
+'X DOUT8 18 -750 -300 200 R 28 28 1 1 O\r\n' + 
+'X OE 28 200 -800 200 U 28 28 1 1 I\r\n' + 
+'X AGND@38 38 800 50 200 L 28 28 1 1 P\r\n' + 
+'X DGND@48 48 50 750 200 D 28 28 1 1 W\r\n' + 
+'X DOUT9 19 -250 -800 200 U 28 28 1 1 O\r\n' + 
+'X DGND/RSVD 29 250 -800 200 U 28 28 1 1 P\r\n' + 
+'X VAA@39 39 800 100 200 L 28 28 1 1 P\r\n' + 
+'ENDDRAW\r\n' + 
+'ENDDEF\r\n' + 
+'#\r\n' + 
+'# PWR_FLAG\r\n' + 
+'#\r\n' + 
+'DEF PWR_FLAG #FLG 0 0 N N 1 F P\r\n' + 
+'F0 "#FLG" 0 270 30 H I C CNN\r\n' + 
+'F1 "PWR_FLAG" 0 230 30 H V C CNN\r\n' + 
+'F2 "" 0 0 60 H V C CNN\r\n' + 
+'F3 "" 0 0 60 H V C CNN\r\n' + 
+'DRAW\r\n' + 
+'X pwr 1 0 0 0 U 20 20 0 0 w\r\n' + 
+'P 3 0 1 0  0 0  0 100  0 100 N\r\n' + 
+'P 5 0 1 0  0 100  -100 150  0 200  100 150  0 100 N\r\n' + 
+'ENDDRAW\r\n' + 
+'ENDDEF\r\n' + 
+'#\r\n' + 
+'#End Library';
+
+	</script>
+</body>
+</html>
