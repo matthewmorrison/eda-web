@@ -132,6 +132,8 @@ EeSchema.prototype._init = function() {
 			    updateElement = true;
 	        }
             else if(ev.type == 'panstart') {
+				console.log(START_X, START_Y);
+			
 				startDraw = new Date().getTime();
                 isPanning = true;
             }
@@ -140,15 +142,13 @@ EeSchema.prototype._init = function() {
 				startDraw = new Date().getTime();
 	            //initScale = 1; //ees.fcanvas.getZoom();
 	        }
-            else if(ev.isFinal || (ev.type == 'pinchend' && !isPanning)) { // hammerjs has a bug that prevents isFinal from getting set when pinchend
+            //else if(ev.isFinal || (ev.type == 'pinchend' && !isPanning)) { // hammerjs has a bug that prevents isFinal from getting set when pinchend
 		        //ees.coords.html('isFinal');
-                redraw = true;
-				START_X = 0;
-				START_Y = 0;
-				initScale = 1;
-            } 
+            //    redraw = true;
+            //} 
 		    else if(ev.type == 'pinchend') {
-				
+				isPinching = false;
+				redraw = true;
 		        //ees.coords.html('pinchend');
 		        /*isPinching = false;
 		        transform.scale = initScale * ev.scale;
@@ -161,6 +161,7 @@ EeSchema.prototype._init = function() {
 	        else if(ev.type == 'panend') {
 		        //ees.coords.html('panend');
 		        isPanning = false;
+				redraw = true;
 	        }
 			
 			if(redraw) {
@@ -173,11 +174,18 @@ EeSchema.prototype._init = function() {
 				console.log(rt);
 				
 				ees.redrawTime.html('<span>' + rt + '</span>');
-			
+		
 				if(isPanning || isPinching) {
 					START_X = -ev.deltaX;
 					START_Y = -ev.deltaY;
 					initScale = 1/ev.scale;
+					console.log(ev.type, isPanning, isPinching);
+				}
+				else {
+					START_X = 0;
+					START_Y = 0;
+					initScale = 1;
+					console.log('reset vars');
 				}
 			
 			    resetElement();
