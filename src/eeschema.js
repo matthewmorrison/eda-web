@@ -107,8 +107,10 @@ EeSchema.prototype._init = function() {
 	        || ev.type == 'pinchend'
 	        || ev.type == 'panstart'
 	        || ev.type == 'panend') {
-	            ees.coords.html(ees.coords.html() + '->' + ev.type);
+	            ees.coords.html(ees.coords.html() + '->' + ev.type + (ev.isFinal ? '[isFinal]' : ''));
 	        }
+	        
+	        
 	         
 	    
 	    console.log(ev);
