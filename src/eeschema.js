@@ -18,7 +18,7 @@ function EeSchema(container) {
 	this.canvasContainer = $('<div class="eeschema-canvas-container" />');
 	this.coords = $('<div class="eeschema-coords" >Coords</div>');
 	this.canvasTouch = $('<div class="eeschema-canvas-touch" >');
-	this.target = $('<div class="debug" >2</div>');
+	this.target = $('<div class="debug" >3</div>');
 	this.scale = $('<div class="scale" >1</div>');
 	this.deltas = $('<div class="coords" >0, 0</div>');
 
@@ -93,8 +93,8 @@ EeSchema.prototype._init = function() {
 	   
 	function onGesture(ev) {
 	    try {
-			this.scale = ev.scale;
-			this.deltas.html(ev.deltaX + ', ' + ev.deltaY);
+			ees.scale = ev.scale;
+			ees.deltas.html(ev.deltaX + ', ' + ev.deltaY);
 	        if(ev.type == 'pinchstart'
 	        || ev.type == 'pinchend'
 	        || ev.type == 'panstart'
@@ -106,7 +106,7 @@ EeSchema.prototype._init = function() {
 	            if(ev.isFinal)
 	            	l += '[isFinal]';
 	            
-	            ees.target.html('<div>' + ev.target.className + '</div><div>' + ev.scale + '</div><div>' + ev.deltaX + ', ' + ev.deltaY + '</div>');
+	            ees.target.html(ev.target.className);
 	            
 	            ees.coords.html(ees.coords.html() + '->' + ev.type + l);
 	        }
@@ -156,7 +156,7 @@ EeSchema.prototype._init = function() {
 	        }
         }
         catch(e) {
-            this.coords.html('Error: ' + e);
+            ees.coords.html('Error: ' + e);
         }   
 	}
 	
