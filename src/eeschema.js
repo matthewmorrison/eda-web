@@ -81,7 +81,7 @@ EeSchema.prototype._init = function() {
 
 	var reqAnimationFrame = (function () {
 		return window[Hammer.prefixed(window, 'requestAnimationFrame')] || function (callback) {
-			window.setTimeout(callback, 1000 / 60);
+			window.setTimeout(callbkack, 1000 / 60);
 		};
 	})();
 	
@@ -100,7 +100,7 @@ EeSchema.prototype._init = function() {
 	            if(ev.isFinal)
 	            	l += '[isFinal]';
 	            
-	            ees.target.html(ev.target.className);
+	            ees.target.html('<div>' + ev.target.className + '</div><div>' + ev.scale + '</div><div>' + ev.deltaX + ', ' + ev.deltaY + '</div>');
 	            
 	            ees.coords.html(ees.coords.html() + '->' + ev.type + l);
 	        }
