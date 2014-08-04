@@ -134,7 +134,7 @@ EeSchema.prototype._init = function() {
 	            //initScale = 1; //ees.fcanvas.getZoom();
 	        }
             else if(ev.isFinal || (ev.type == 'pinchend' && !isPanning)) { // hammerjs has a bug that prevents isFinal from getting set when pinchend
-		        ees.coords.html('isFinal');
+		        //ees.coords.html('isFinal');
                 var center = ees.fcanvas.getCenter();
 			    ees.fcanvas.zoomToPoint(new fabric.Point(center.left, center.top), transform.scale * ees.fcanvas.getZoom());
 			
@@ -144,7 +144,7 @@ EeSchema.prototype._init = function() {
 			    requestElementUpdate();
             } 
 		    else if(ev.type == 'pinchend') {
-		        ees.coords.html('pinchend');
+		        //ees.coords.html('pinchend');
 		        isPinching = false;
 		        transform.scale = initScale * ev.scale;
 		        requestElementUpdate();
@@ -154,7 +154,7 @@ EeSchema.prototype._init = function() {
 		        }
 	        }   
 	        else if(ev.type == 'panend') {
-		        ees.coords.html('panend');
+		        //ees.coords.html('panend');
 		        isPanning = false;
 	        }
         }
