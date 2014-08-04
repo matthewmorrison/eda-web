@@ -18,7 +18,7 @@ function EeSchema(container) {
 	this.canvasContainer = $('<div class="eeschema-canvas-container" />');
 	this.coords = $('<div class="eeschema-coords" >Coords</div>');
 	this.canvasTouch = $('<div class="eeschema-canvas-touch" >');
-	this.target = $('<div class="debug" >3</div>');
+	this.target = $('<div class="debug" >4</div>');
 	this.scale = $('<div class="scale" >1</div>');
 	this.deltas = $('<div class="coords" >0, 0</div>');
 
@@ -85,7 +85,7 @@ EeSchema.prototype._init = function() {
 
 	var reqAnimationFrame = (function () {
 		return window[Hammer.prefixed(window, 'requestAnimationFrame')] || function (callback) {
-			window.setTimeout(callbkack, 1000 / 60);
+			window.setTimeout(callback, 1000 / 60);
 		};
 	})();
 	
