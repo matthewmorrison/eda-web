@@ -81,7 +81,7 @@ EeSchema.prototype._init = function() {
 	mc.add(new Hammer.Pinch({ threshold: 0 })).recognizeWith([mc.get('pan')]);
 	
 	mc
-	    .on("pinchstart pinchmove pinchend panstart panmove panend", onGesture);
+	    .on("pinchstart pinchmove pinchend panstart panmove panend pinchcancel pancancel", onGesture);
 
 	var reqAnimationFrame = (function () {
 		return window[Hammer.prefixed(window, 'requestAnimationFrame')] || function (callback) {
@@ -98,7 +98,9 @@ EeSchema.prototype._init = function() {
 	        if(ev.type == 'pinchstart'
 	        || ev.type == 'pinchend'
 	        || ev.type == 'panstart'
-	        || ev.type == 'panend') {
+	        || ev.type == 'panend'
+			|| ev.type == 'pinchcancel'
+			|| ev.type == 'pancancel') {
 	            var l = '';
 	            if(ev.isFirst)
 	            	l += '[isFirst]';
