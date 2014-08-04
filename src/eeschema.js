@@ -93,7 +93,7 @@ EeSchema.prototype._init = function() {
 	   
 	function onGesture(ev) {
 	    try {
-			ees.scale = ev.scale;
+			ees.scale.html(ev.scale);
 			ees.deltas.html(ev.deltaX + ', ' + ev.deltaY);
 	        if(ev.type == 'pinchstart'
 	        || ev.type == 'pinchend'
