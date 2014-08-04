@@ -75,23 +75,6 @@ EeSchema.prototype._init = function() {
 	
 	mc
 	    .on("pinchstart pinchmove pinchend panstart panmove panend", onGesture);
-		/*.on("pinchstart pinchmove", onPinch)
-		.on("pinchend", function(e) {
-			var center = ees.fcanvas.getCenter();
-			ees.fcanvas.zoomToPoint(new fabric.Point(center.left, center.top), ev.scale * ees.fcanvas.getZoom());
-			
-		    gestureEnd(e);
-		})
-		.on("panstart", function(e) {
-			// Draw whole preview here
-			onPan(e);
-		})
-		.on("panmove", function(e) {
-			onPan(e);
-		})
-		.on("panend", function(e) {
-		
-		});*/
 
 	var reqAnimationFrame = (function () {
 		return window[Hammer.prefixed(window, 'requestAnimationFrame')] || function (callback) {
@@ -107,13 +90,16 @@ EeSchema.prototype._init = function() {
 	        || ev.type == 'pinchend'
 	        || ev.type == 'panstart'
 	        || ev.type == 'panend') {
-	            ees.coords.html(ees.coords.html() + '->' + ev.type + (ev.isFinal ? '[isFinal]' : ''));
+	            var l = '';
+	            if(ev.isFirst)
+	            	l += '[isFirst]';
+	            
+	            if(ev.isFinal)
+	            	l += '[isFinal]';
+	            
+	            ees.coords.html(ees.coords.html() + '->' + ev.type + l);
 	        }
 	        
-	        
-	         
-	    
-	    console.log(ev);
             if(ev.type == 'panmove') {
 			    transform.translate = {
 				    x: START_X + ev.deltaX,
