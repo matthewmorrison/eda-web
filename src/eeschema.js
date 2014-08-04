@@ -17,10 +17,9 @@ function EeSchema(container) {
 	this.sizer = $('<div class="eeschema-canvas-sizer" />');
 	this.canvasContainer = $('<div class="eeschema-canvas-container" />');
 	this.coords = $('<div class="eeschema-coords" >Coords</div>');
-	this.panPreview = $('<div class="eeschema-pan-preview" >');
+	this.canvasTouch = $('<div class="eeschema-canvas-touch" >');
 
 	this.container.append(this.canvasContainer);
-	this.canvasContainer.append(this.panPreview);
 	//this.panner.append(this.sizer);
 	this.canvasContainer.append(this.canvas);
 	
@@ -30,20 +29,16 @@ function EeSchema(container) {
 	this.container.append(this.rightPanel);
 	this.rightPanel.append(this.testButton);
 	this.testButton.on('click', function() {
-	    //var t = ees.libraries['MPU-9250'].Create(ees.fcanvas.getCenter());
-	//	ees.fcanvas.add(t);
 		ees.resetView();
 	});
 	
 	this.container.append(this.bottomPanel);
 	this.bottomPanel.append(this.coords);
-	
 	this.fcanvas = new fabric.Canvas(this.canvas.get(0));
-	
-	this.upperCanvas = this.container.find('.upper-canvas');
-	
+	this.canvasContainer.append(this.canvasTouch);
+
 	this._init();
-	
+
 	this.fcanvas.selection = false;
 	this.fcanvas.allowTouchScrolling = false;
 
@@ -73,7 +68,7 @@ EeSchema.prototype._init = function() {
 	var timer;	
 	var el = document.querySelector(".canvas-container");
 	
-	mc = new Hammer.Manager(el);//document.querySelector(".eeschema-canvas-container"));
+	mc = new Hammer.Manager(document.querySelector(".eeschema-canvas-touch"));
 	mc.add(new Hammer.Pan({ threshold: 0, pointers: 0 }));
 	//mc.add(new Hammer.Pinch({ threshold: 0 }))
 	mc.add(new Hammer.Pinch({ threshold: 0 })).recognizeWith([mc.get('pan')]);
@@ -105,9 +100,17 @@ EeSchema.prototype._init = function() {
 	})();
 	
 	var initScale = 1;
-	
+	   
 	function onGesture(ev) {
 	    try {
+	        if(ev.type == 'pinchstart'
+	        || ev.type == 'pinchend'
+	        || ev.type == 'panstart'
+	        || ev.type == 'panend') {
+	            ees.coords.html(ees.coords.html() + '->' + ev.type);
+	        }
+	         
+	    
 	    console.log(ev);
             if(ev.type == 'panmove') {
 			    transform.translate = {
@@ -128,7 +131,7 @@ EeSchema.prototype._init = function() {
        		    isPinching = true;
 	            //initScale = 1; //ees.fcanvas.getZoom();
 	        }
-            else if(ev.isFinal || (!isPanning && ev.type == 'pinchend')) { // hammerjs has a bug that prevents isFinal from getting set when pinchend
+            else if(ev.isFinal || (ev.type == 'pinchend' && !isPanning)) { // hammerjs has a bug that prevents isFinal from getting set when pinchend
 		        ees.coords.html('isFinal');
                 var center = ees.fcanvas.getCenter();
 			    ees.fcanvas.zoomToPoint(new fabric.Point(center.left, center.top), transform.scale * ees.fcanvas.getZoom());
@@ -139,12 +142,12 @@ EeSchema.prototype._init = function() {
 			    requestElementUpdate();
             } 
 		    else if(ev.type == 'pinchend') {
-		        //ees.coords.html('pinchend');
+		        ees.coords.html('pinchend');
 		        isPinching = false;
 		        transform.scale = initScale * ev.scale;
 		        requestElementUpdate();
 		        
-		        if(!ev.isFinal) {
+		        if(!ev.isFinal || isPanning) {
 		            initScale = transform.scale;
 		        }
 	        }   
@@ -202,7 +205,7 @@ EeSchema.prototype._init = function() {
 	
 	resetElement();
 	
-    this.upperCanvas.on('mousewheel', function(e) {
+    this.canvasTouch.on('mousewheel', function(e) {
         if(e.deltaY > 0)
             ees.zoomIn();
         else if(e.deltaY < 0)
