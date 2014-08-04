@@ -18,7 +18,7 @@ function EeSchema(container) {
 	this.canvasContainer = $('<div class="eeschema-canvas-container" />');
 	this.coords = $('<div class="eeschema-coords" >Coords</div>');
 	this.canvasTouch = $('<div class="eeschema-canvas-touch" >');
-	this.target = $('<div class="debug" />');
+	this.target = $('<div class="debug" >1</div>');
 
 	this.container.append(this.canvasContainer);
 	//this.panner.append(this.sizer);
@@ -100,7 +100,7 @@ EeSchema.prototype._init = function() {
 	            if(ev.isFinal)
 	            	l += '[isFinal]';
 	            
-	            ees.target.html(ev.target);
+	            ees.target.html(ev.target.className);
 	            
 	            ees.coords.html(ees.coords.html() + '->' + ev.type + l);
 	        }
