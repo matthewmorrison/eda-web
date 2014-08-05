@@ -18,7 +18,7 @@ function EeSchema(container) {
 	this.canvasContainer = $('<div class="eeschema-canvas-container" />');
 	this.coords = $('<div class="eeschema-coords" >Coords</div>');
 	this.canvasTouch = $('<div class="eeschema-canvas-touch" >');
-	this.target = $('<div class="debug" >6</div>');
+	this.target = $('<div class="debug" >7</div>');
 	this.scale = $('<div class="scale" >1</div>');
 	this.deltas = $('<div class="coords" >0, 0</div>');
 	this.redrawTime = $('<div class="redraw-time" >redraw</div>');
@@ -83,7 +83,7 @@ EeSchema.prototype._init = function() {
 	mc.add(new Hammer.Pinch({ threshold: 0 })).recognizeWith([mc.get('pan')]);
 	
 	mc
-	    .on("pinchstart pinchmove pinchend panstart panmove panend pinchcancel pancancel", onGesture);
+	    .on("pinchstart pinchmove pinchend panstart panmove panend", onGesture);
 
 	var reqAnimationFrame = (function () {
 		return window[Hammer.prefixed(window, 'requestAnimationFrame')] || function (callback) {
@@ -98,7 +98,7 @@ EeSchema.prototype._init = function() {
 	function onGesture(ev) {
 	    try {
 			doRedraw = new Date() - startDraw > 1000;
-
+console.log(ev);
 			ees.scale.html(ev.scale);
 			ees.deltas.html(ev.deltaX + ', ' + ev.deltaY);
 	        if(ev.type == 'pinchstart'
@@ -142,25 +142,15 @@ EeSchema.prototype._init = function() {
 				startDraw = new Date().getTime();
 	            //initScale = 1; //ees.fcanvas.getZoom();
 	        }
-            //else if(ev.isFinal || (ev.type == 'pinchend' && !isPanning)) { // hammerjs has a bug that prevents isFinal from getting set when pinchend
-		        //ees.coords.html('isFinal');
-            //    redraw = true;
-            //} 
 		    else if(ev.type == 'pinchend') {
 				isPinching = false;
 				doRedraw = true;
-		        //ees.coords.html('pinchend');
-		        /*isPinching = false;
-		        transform.scale = initScale * ev.scale;
-		        updateElement = true;
-		        
-		        if(!ev.isFinal || isPanning) {
-		            initScale = transform.scale;
-		        }*/
 	        }   
 	        else if(ev.type == 'panend') {
 		        //ees.coords.html('panend');
-		        isPanning = false;
+				if(!isPinching)
+					isPanning = false;
+					
 				doRedraw = true;
 	        }
 
@@ -225,6 +215,7 @@ EeSchema.prototype._init = function() {
 	}
 	
 	function updateElementTransform() {
+		console.log('redraw?', doRedraw);
 		if(doRedraw) {
 			redraw();
 		}
