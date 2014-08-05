@@ -172,7 +172,7 @@ EeSchema.prototype._init = function() {
 			transform.scale = initScale * ev.scale;
 			
 			if(doRedraw) {
-				redraw(ev);
+				redraw();
 				
 			    resetElement();
 				
@@ -188,7 +188,7 @@ EeSchema.prototype._init = function() {
         }   
 	}
 	
-	function redraw(ev) {
+	function redraw() {
 		var center = ees.fcanvas.getCenter();
 		startDraw = new Date().getTime();
 		
@@ -200,17 +200,20 @@ EeSchema.prototype._init = function() {
 		
 		ees.redrawTime.html('<span>' + rt + '</span>');
 		
-		if(isPanning || isPinching) {
+		if(isPanning) {
 			START_X -= transform.translate.x;
 			START_Y -= transform.translate.y;
-			initScale = 1/transform.scale;
-			console.log(ev.type, isPanning, isPinching);
 		}
 		else {
 			START_X = 0;
 			START_Y = 0;
+		}
+		
+		if(isPinching) {
+			initScale = 1/transform.scale;
+		}
+		else {
 			initScale = 1;
-			console.log('reset vars');
 		}
 	}
 	
