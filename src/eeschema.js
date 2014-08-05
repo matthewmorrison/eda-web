@@ -130,6 +130,7 @@ EeSchema.prototype._init = function() {
             else if(ev.type == 'pinchmove') {
 	            ees.transform.scale = initScale * ev.scale;
 			    updateElement = true;
+				isPanning = true;
 	        }
             else if(ev.type == 'panstart') {		
 				startDraw = new Date().getTime();
@@ -138,16 +139,16 @@ EeSchema.prototype._init = function() {
 	        else if(ev.type == 'pinchstart') {
        		    isPinching = true;
 				startDraw = new Date().getTime();
-	            //initScale = 1; //ees.fcanvas.getZoom();
 	        }
 		    else if(ev.type == 'pinchend') {
 				isPinching = false;
 				doRedraw = true;
 	        }   
 	        else if(ev.type == 'panend') {
-		        //ees.coords.html('panend');
 				if(!isPinching)
 					isPanning = false;
+				else
+					isPinching = false;
 					
 				doRedraw = true;
 	        }
@@ -159,11 +160,7 @@ EeSchema.prototype._init = function() {
 			
 			ees.transform.scale = initScale * ev.scale;
 			
-			if(doRedraw) {
-				//redraw();
-				
-			    //resetElement();
-				
+			if(doRedraw) {				
 				updateElement = true;
 			}
 			
