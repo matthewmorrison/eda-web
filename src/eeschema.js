@@ -18,7 +18,7 @@ function EeSchema(container) {
 	this.canvasContainer = $('<div class="eeschema-canvas-container" />');
 	this.coords = $('<div class="eeschema-coords" >Coords</div>');
 	this.canvasTouch = $('<div class="eeschema-canvas-touch" >');
-	this.target = $('<div class="debug" >8</div>');
+	this.target = $('<div class="debug" >9</div>');
 	this.scale = $('<div class="scale" >1</div>');
 	this.deltas = $('<div class="coords" >0, 0</div>');
 	this.redrawTime = $('<div class="redraw-time" >redraw</div>');
@@ -80,7 +80,6 @@ EeSchema.prototype._init = function() {
 	
 	mc = new Hammer.Manager(document.querySelector(".eeschema-canvas-touch"));
 	mc.add(new Hammer.Pan({ threshold: 0, pointers: 0 }));
-	//mc.add(new Hammer.Pinch({ threshold: 0 }))
 	mc.add(new Hammer.Pinch({ threshold: 0 })).recognizeWith([mc.get('pan')]);
 	
 	mc
