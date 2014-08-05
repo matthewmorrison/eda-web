@@ -65,13 +65,14 @@ EeSchema.prototype._init = function() {
 	var ticking = false;
 	var isPinching = false;
 	var isPanning = false;
-	var transform = {
-				translate: { x: START_X, y: START_Y },
-				scale: 1,
-				angle: 0,
-				rx: 0,
-				ry: 0,
-				rz: 0
+	
+	ees.transform = {
+		translate: { x: START_X, y: START_Y },
+		scale: 1,
+		angle: 0,
+		rx: 0,
+		ry: 0,
+		rz: 0
 	};
 	
 	var timer;	
@@ -98,7 +99,7 @@ EeSchema.prototype._init = function() {
 	function onGesture(ev) {
 	    try {
 			doRedraw = new Date() - startDraw > 1000;
-console.log(ev);
+
 			ees.scale.html(ev.scale);
 			ees.deltas.html(ev.deltaX + ', ' + ev.deltaY);
 	        if(ev.type == 'pinchstart'
@@ -120,7 +121,7 @@ console.log(ev);
 	        }
 	        
             if(ev.type == 'panmove') {
-			    transform.translate = {
+			    ees.transform.translate = {
 				    x: START_X + ev.deltaX,
 				    y: START_Y + ev.deltaY
 			    };
@@ -128,12 +129,10 @@ console.log(ev);
 			    updateElement = true;
             }
             else if(ev.type == 'pinchmove') {
-	            transform.scale = initScale * ev.scale;
+	            ees.transform.scale = initScale * ev.scale;
 			    updateElement = true;
 	        }
-            else if(ev.type == 'panstart') {
-				console.log(START_X, START_Y);
-			
+            else if(ev.type == 'panstart') {		
 				startDraw = new Date().getTime();
                 isPanning = true;
             }
@@ -154,12 +153,12 @@ console.log(ev);
 				doRedraw = true;
 	        }
 
-			transform.translate = {
+			ees.transform.translate = {
 				    x: START_X + ev.deltaX,
 				    y: START_Y + ev.deltaY
 			};
 			
-			transform.scale = initScale * ev.scale;
+			ees.transform.scale = initScale * ev.scale;
 			
 			if(doRedraw) {
 				//redraw();
@@ -182,23 +181,23 @@ console.log(ev);
 		var center = ees.fcanvas.getCenter();
 		startDraw = new Date().getTime();
 		
-		if(transform.scale != 1) {
-			ees.fcanvas.zoomToPoint(new fabric.Point(center.left, center.top), transform.scale * ees.fcanvas.getZoom());
+		if(ees.transform.scale != 1) {
+			ees.fcanvas.zoomToPoint(new fabric.Point(center.left, center.top), ees.transform.scale * ees.fcanvas.getZoom());
 			
 			if(isPinching) {
-				initScale = 1/transform.scale;			
+				initScale = 1/ees.transform.scale;			
 			}
 			else {
 				initScale = 1;
 			}
 		}
 		
-		if(transform.translate.x != 0 || transform.translate.y != 0) {
-			ees.fcanvas.relativePan(new fabric.Point(transform.translate.x, transform.translate.y));
+		if(ees.transform.translate.x != 0 || ees.transform.translate.y != 0) {
+			ees.fcanvas.relativePan(new fabric.Point(ees.transform.translate.x, ees.transform.translate.y));
 			
 			if(isPanning) {
-				START_X -= transform.translate.x;
-				START_Y -= transform.translate.y;
+				START_X -= ees.transform.translate.x;
+				START_Y -= ees.transform.translate.y;
 			}
 			else {
 				START_X = 0;
@@ -207,8 +206,6 @@ console.log(ev);
 		}
 		
 		var rt = new Date().getTime() - startDraw;
-		console.log(rt);
-		
 		ees.redrawTime.html('<span>' + rt + '</span>');
 		
 		/*if(isPanning) {
@@ -237,15 +234,14 @@ console.log(ev);
 	}
 	
 	function updateElementTransform() {
-		console.log('redraw?', doRedraw);
 		if(doRedraw) {
 			redraw();
 		}
 	
 		var value = [
-			'translate3d(' + transform.translate.x + 'px, ' + transform.translate.y + 'px, 0)',
-			'scale(' + transform.scale + ', ' + transform.scale + ')',
-			'rotate3d('+ transform.rx +','+ transform.ry +','+ transform.rz +','+  transform.angle + 'deg)'
+			'translate3d(' + ees.transform.translate.x + 'px, ' + ees.transform.translate.y + 'px, 0)',
+			'scale(' + ees.transform.scale + ', ' + ees.transform.scale + ')',
+			'rotate3d('+ ees.transform.rx +','+ ees.transform.ry +','+ ees.transform.rz +','+  ees.transform.angle + 'deg)'
 		];
 
 		value = value.join(" ");
@@ -264,13 +260,12 @@ console.log(ev);
 
 	function resetElement() {
 			$(el).addClass('animate');
-			transform.translate = { x: 0, y: 0 };
-			transform.scale = 1;
-			transform.angle = 0;
-			transform.rx = 0;
-			transform.ry = 0;
-			transform.rz = 0;
-			//initScale = 1;
+			ees.transform.translate = { x: 0, y: 0 };
+			ees.transform.scale = 1;
+			ees.transform.angle = 0;
+			ees.transform.rx = 0;
+			ees.transform.ry = 0;
+			ees.transform.rz = 0;
 
 			requestElementUpdate();
 	}
@@ -282,117 +277,13 @@ console.log(ev);
             ees.zoomIn();
         else if(e.deltaY < 0)
             ees.zoomOut();
-        
-        
-		/*e.preventDefault();
-	    zoomer = $(this);
-		var scroll = zoomer.scrollTop();
-		
-		if(scroll < 1000) {	
-			ees.zoomIn();
-		}
-		else if(scroll > 1000) {
-			ees.zoomOut();
-		}
-		
-		zoomer.scrollTop(1000);*/
 	});
 	
-/*	this.panner.on('scroll', function(e) {	
-		var panner = $(this);
-		
-		var left = panner.scrollLeft();
-		var top = panner.scrollTop();
-		
-		ees.zoomer.css('left', left);
-			
-		ees.zoomer.css('top', top);
-		
-		if(ees.fcanvas.viewportTransform[4] > 0)
-		    left -= ees.fcanvas.viewportTransform[4];
-		    
-		if(ees.fcanvas.viewportTransform[5] > 0)
-		    top -= ees.fcanvas.viewportTransform[5];
-		
-	    ees.fcanvas.absolutePan(new fabric.Point(left, top));
-	    
-	    ees.updatePan();
-	});*/
-
-	//this.zoomer.scrollTop(1000);
-	
-	/*this.fcanvas.on('mouse:down', function(obj) {
-		var dragHandle = function(obj) {
-			ees.canvasDrag(obj.e);
-		}
-	
-	    $(window).on('mousemove', '', dragHandle);
-		
-		ees.dragStatus = 'start';
-		ees.dragStart = [obj.e.clientX, obj.e.clientY];
-		ees.dragPanStart = [ees.fcanvas.viewportTransform[4], ees.fcanvas.viewportTransform[5]];
-		
-		var upEv = $(window).one({
-			mouseup: function() {
-				ees.dragStatus = 'none';
-				$(window).off('mousemove', '', dragHandle);
-				ees.updatePan();
-			}
-		});
-	});*/
-	
-	this.fcanvas.on('mouse:move', function(obj) {
-		var e = obj.e;	
-
+	this.canvasTouch.on('mousemove', function(e) {
 		ees.fcanvas.mouseX = e.clientX;
 		ees.fcanvas.mouseY = e.clientY;
-		var zoom = ees.fcanvas.getZoom();
-		
-		//ees.coords.html((e.clientX/zoom - ees.fcanvas.viewportTransform[4]/zoom) + ', ' + (e.clientY/zoom - ees.fcanvas.viewportTransform[5]/zoom));
 	});
-	
-	
-    /*var canvasHammer = new Hammer(this.canvasContainer.get(0));
-    
-    canvasHammer.on('panstart', function(e) {
-        ees.coords.html('pan');
-    	ees.dragPanStart = [ees.fcanvas.viewportTransform[4], ees.fcanvas.viewportTransform[5]];
-        ees.dragStatus = 'start';
-        
-        
-        ees.container.addClass('panning');
-        ees.panPreview.css('top', 0);
-        ees.panPreview.css('left', 0);
-        ees.panPreview.css('opacity', .5);
-    })
-    .on('panmove', function(e) {
-        ees.panPreview.css('top', e.deltaY);
-        ees.panPreview.css('left', e.deltaX);
-    
-       // var x = -ees.dragPanStart[0] - e.deltaX;
-        //var y = -ees.dragPanStart[1] - e.deltaY;   
-        //ees.fcanvas.absolutePan(new fabric.Point(x, y));
-    })
-    .on('panend', function(e) {
-        ees.dragStatus = 'none';
-        
-        ees.panPreview.css('top', 0);
-        ees.panPreview.css('left', 0);
-        ees.container.removeClass('panning');
-        var x = -ees.dragPanStart[0] - e.deltaX;
-        var y = -ees.dragPanStart[1] - e.deltaY;   
-        ees.fcanvas.absolutePan(new fabric.Point(x, y));
-    })
-    .on('pinchstart', function() {
-        this.coords.html('zoom');
-        ees.zoomOut();
-    });*/
 }
-
-//var screen = document.querySelector(".device-screen");
-
-
-
 
 EeSchema.prototype._initMobile = function() {
 
@@ -420,14 +311,6 @@ function getScrollbarWidth() {
   }
   return W;
 };
-
-/*$(function() {
-    $('.eeschema').each(function(index, item) {
-        var ees = new EeSchema(item);
-        
-        $(item).data('eeschema', ees);
-    });
-});*/
 
 EeSchema.prototype.open = function(location) {
     this.url = location;
