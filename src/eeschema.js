@@ -18,7 +18,7 @@ function EeSchema(container) {
 	this.canvasContainer = $('<div class="eeschema-canvas-container" />');
 	this.coords = $('<div class="eeschema-coords" >Coords</div>');
 	this.canvasTouch = $('<div class="eeschema-canvas-touch" >');
-	this.target = $('<div class="debug" >5</div>');
+	this.target = $('<div class="debug" >6</div>');
 	this.scale = $('<div class="scale" >1</div>');
 	this.deltas = $('<div class="coords" >0, 0</div>');
 	this.redrawTime = $('<div class="redraw-time" >redraw</div>');
@@ -172,9 +172,9 @@ EeSchema.prototype._init = function() {
 			transform.scale = initScale * ev.scale;
 			
 			if(doRedraw) {
-				redraw();
+				//redraw();
 				
-			    resetElement();
+			    //resetElement();
 				
 				updateElement = true;
 			}
@@ -215,6 +215,8 @@ EeSchema.prototype._init = function() {
 		else {
 			initScale = 1;
 		}
+		
+		resetElement();
 	}
 	
 	function onPanEnd(ev) {			
@@ -223,6 +225,10 @@ EeSchema.prototype._init = function() {
 	}
 	
 	function updateElementTransform() {
+		if(doRedraw) {
+			redraw();
+		}
+	
 		var value = [
 			'translate3d(' + transform.translate.x + 'px, ' + transform.translate.y + 'px, 0)',
 			'scale(' + transform.scale + ', ' + transform.scale + ')',
