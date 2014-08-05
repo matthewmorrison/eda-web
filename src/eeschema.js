@@ -18,7 +18,7 @@ function EeSchema(container) {
 	this.canvasContainer = $('<div class="eeschema-canvas-container" />');
 	this.coords = $('<div class="eeschema-coords" >Coords</div>');
 	this.canvasTouch = $('<div class="eeschema-canvas-touch" >');
-	this.target = $('<div class="debug" >7</div>');
+	this.target = $('<div class="debug" >8</div>');
 	this.scale = $('<div class="scale" >1</div>');
 	this.deltas = $('<div class="coords" >0, 0</div>');
 	this.redrawTime = $('<div class="redraw-time" >redraw</div>');
@@ -182,17 +182,39 @@ console.log(ev);
 		var center = ees.fcanvas.getCenter();
 		startDraw = new Date().getTime();
 		
-		ees.fcanvas.zoomToPoint(new fabric.Point(center.left, center.top), transform.scale * ees.fcanvas.getZoom()); 
-		ees.fcanvas.relativePan(new fabric.Point(transform.translate.x, transform.translate.y));
+		if(transform.scale != 1) {
+			ees.fcanvas.zoomToPoint(new fabric.Point(center.left, center.top), transform.scale * ees.fcanvas.getZoom());
+			
+			if(isPinching) {
+				initScale = 1/transform.scale;			
+			}
+			else {
+				initScale = 1;
+			}
+		}
+		
+		if(transform.translate.x != 0 || transform.translate.y != 0) {
+			ees.fcanvas.relativePan(new fabric.Point(transform.translate.x, transform.translate.y));
+			
+			if(isPanning) {
+				START_X -= transform.translate.x;
+				START_Y -= transform.translate.y;
+			}
+			else {
+				START_X = 0;
+				START_Y = 0;
+			}
+		}
 		
 		var rt = new Date().getTime() - startDraw;
 		console.log(rt);
 		
 		ees.redrawTime.html('<span>' + rt + '</span>');
 		
-		if(isPanning) {
+		/*if(isPanning) {
 			START_X -= transform.translate.x;
 			START_Y -= transform.translate.y;
+			initScale = 1/transform.scale;
 		}
 		else {
 			START_X = 0;
@@ -204,7 +226,7 @@ console.log(ev);
 		}
 		else {
 			initScale = 1;
-		}
+		}*/
 		
 		resetElement();
 	}
