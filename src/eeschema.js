@@ -18,7 +18,7 @@ function EeSchema(container) {
 	this.canvasContainer = $('<div class="eeschema-canvas-container" />');
 	this.coords = $('<div class="eeschema-coords" >Coords</div>');
 	this.canvasTouch = $('<div class="eeschema-canvas-touch" >');
-	this.target = $('<div class="debug" >9</div>');
+	this.target = $('<div class="debug" >10</div>');
 	this.scale = $('<div class="scale" >1</div>');
 	this.deltas = $('<div class="coords" >0, 0</div>');
 	this.redrawTime = $('<div class="redraw-time" >redraw</div>');
@@ -97,7 +97,7 @@ EeSchema.prototype._init = function() {
 	   
 	function onGesture(ev) {
 	    try {
-			doRedraw = new Date() - startDraw > 1000;
+			doRedraw = new Date() - startDraw > 2000;
 
 			ees.scale.html(ev.scale);
 			ees.deltas.html(ev.deltaX + ', ' + ev.deltaY);
@@ -184,7 +184,7 @@ EeSchema.prototype._init = function() {
 			ees.fcanvas.zoomToPoint(new fabric.Point(center.left, center.top), ees.transform.scale * ees.fcanvas.getZoom());
 			
 			if(isPinching) {
-				initScale = 1/ees.transform.scale;			
+				initScale = initScale/ees.transform.scale;			
 			}
 			else {
 				initScale = 1;
