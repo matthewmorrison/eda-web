@@ -18,7 +18,7 @@ function EeSchema(container) {
 	this.canvasContainer = $('<div class="eeschema-canvas-container" />');
 	this.coords = $('<div class="eeschema-coords" >Coords</div>');
 	this.canvasTouch = $('<div class="eeschema-canvas-touch" >');
-	this.target = $('<div class="debug" >26</div>');
+	this.target = $('<div class="debug" >27</div>');
 	this.scale = $('<div class="scale" >1</div>');
 	this.deltas = $('<div class="coords" >0, 0</div>');
 	this.redrawTime = $('<div class="redraw-time" >redraw</div>');
@@ -81,8 +81,7 @@ EeSchema.prototype._init = function() {
 	mc.add(new Hammer.Pan({ threshold: 0, pointers: 0 }));
 	mc.add(new Hammer.Pinch({ threshold: 0 })).recognizeWith([mc.get('pan')]);
 	
-	mc
-	    .on("pinchstart pinchmove pinchend panstart panmove panend", onGesture);
+	mc.on("pinchstart pinchmove pinchend panstart panmove panend", onGesture);
 
 	var reqAnimationFrame = (function () {
 		return window[Hammer.prefixed(window, 'requestAnimationFrame')] || function (callback) {
@@ -92,7 +91,7 @@ EeSchema.prototype._init = function() {
 	
 	mc.on("hammer.input", function(ev) {
 		if(ev.isFirst) {
-			ees.coords.html(ees.coords.html() + '->[IFirst');
+			//ees.coords.html(ees.coords.html() + '->[IFirst');
 			initScale = 1;
 			START_X = 0;
 			START_Y = 0;
@@ -107,7 +106,7 @@ EeSchema.prototype._init = function() {
 	    try {
 			doRedraw = new Date() - startDraw > 2000;
 
-			ees.scale.html(ev.scale);
+			/*ees.scale.html(ev.scale);
 			ees.deltas.html(ev.deltaX + ', ' + ev.deltaY);
 	        if(ev.type == 'pinchstart'
 	        || ev.type == 'pinchend'
@@ -122,10 +121,8 @@ EeSchema.prototype._init = function() {
 	            if(ev.isFinal)
 	            	l += '[isFinal]';
 	            
-	           // ees.target.html(ev.target.className);
-	            
 	            ees.coords.html(ees.coords.html() + '->' + ev.type + l);
-	        }
+	        }*/
 	        
 			ees.transform.translate = {
 				    x: START_X + ev.deltaX,
@@ -135,21 +132,6 @@ EeSchema.prototype._init = function() {
 			if(isPinching) {
 			    ees.transform.scale = initScale * ev.scale;
 			}
-	        
-            /*if(ev.type == 'panmove') {
-			    ees.transform.translate = {
-				    x: START_X + ev.deltaX,
-				    y: START_Y + ev.deltaY
-			    };
-			
-			    updateElement = true;
-            }
-            else if(ev.type == 'pinchmove') {
-	            ees.transform.scale = initScale * ev.scale;
-			    updateElement = true;
-				isPanning = true;
-	        }
-            else*/ 
             
             if(ev.type == 'panstart') {		
 				startDraw = new Date().getTime();
@@ -162,7 +144,6 @@ EeSchema.prototype._init = function() {
 		    else if(ev.type == 'pinchend') {
 				isPinching = false;
 				doRedraw = true;				
-				//isPanning = false;
 	        }   
 	        else if(ev.type == 'panend') {
 				if(!isPinching)
@@ -174,12 +155,11 @@ EeSchema.prototype._init = function() {
 	        }
 			
 			if(doRedraw) {
-			    redraw();	
+//			    redraw();	
 				updateElement = true;
 			}
 			
-			//if(updateElement)
-				requestElementUpdate();
+			requestElementUpdate();
 			
         }
         catch(e) {
@@ -190,7 +170,6 @@ EeSchema.prototype._init = function() {
 	function redraw() {
 		var center = ees.fcanvas.getCenter();
 		startDraw = new Date().getTime();
-		
 		
 		if(ees.transform.scale != 1) {
 			ees.fcanvas.zoomToPoint(new fabric.Point(center.left, center.top), ees.transform.scale * ees.fcanvas.getZoom());
@@ -222,35 +201,13 @@ EeSchema.prototype._init = function() {
 		var rt = new Date().getTime() - startDraw;
 		ees.redrawTime.html('<span>' + rt + '</span>');
 		
-		/*if(isPanning) {
-			START_X -= transform.translate.x;
-			START_Y -= transform.translate.y;
-			initScale = 1/transform.scale;
-		}
-		else {
-			START_X = 0;
-			START_Y = 0;
-		}
-		
-		if(isPinching) {
-			initScale = 1/transform.scale;
-		}
-		else {
-			initScale = 1;
-		}*/
-		
 		resetElement();
 	}
 	
-	function onPanEnd(ev) {			
-			
-		    //resetElement();
-	}
-	
 	function updateElementTransform() {
-		//if(doRedraw) {
-		//	redraw();
-		//}
+		if(doRedraw) {
+			redraw();
+		}
 	
 		var value = [
 			'translate3d(' + ees.transform.translate.x + 'px, ' + ees.transform.translate.y + 'px, 0)',
