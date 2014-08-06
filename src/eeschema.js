@@ -18,13 +18,12 @@ function EeSchema(container) {
 	this.canvasContainer = $('<div class="eeschema-canvas-container" />');
 	this.coords = $('<div class="eeschema-coords" >Coords</div>');
 	this.canvasTouch = $('<div class="eeschema-canvas-touch" >');
-	this.target = $('<div class="debug" >11</div>');
+	this.target = $('<div class="debug" >24</div>');
 	this.scale = $('<div class="scale" >1</div>');
 	this.deltas = $('<div class="coords" >0, 0</div>');
 	this.redrawTime = $('<div class="redraw-time" >redraw</div>');
 
 	this.container.append(this.canvasContainer);
-	//this.panner.append(this.sizer);
 	this.canvasContainer.append(this.canvas);
 	
 	var ees = this;
@@ -107,19 +106,28 @@ EeSchema.prototype._init = function() {
 	        || ev.type == 'panend'
 			|| ev.type == 'pinchcancel'
 			|| ev.type == 'pancancel') {
-	            var l = '';
+	            var l = '' + ev.scale;
 	            if(ev.isFirst)
 	            	l += '[isFirst]';
 	            
 	            if(ev.isFinal)
 	            	l += '[isFinal]';
 	            
-	            ees.target.html(ev.target.className);
+	           // ees.target.html(ev.target.className);
 	            
 	            ees.coords.html(ees.coords.html() + '->' + ev.type + l);
 	        }
 	        
-            if(ev.type == 'panmove') {
+			ees.transform.translate = {
+				    x: START_X + ev.deltaX,
+				    y: START_Y + ev.deltaY
+			};
+			
+			if(isPinching) {
+			    ees.transform.scale = initScale * ev.scale;
+			}
+	        
+            /*if(ev.type == 'panmove') {
 			    ees.transform.translate = {
 				    x: START_X + ev.deltaX,
 				    y: START_Y + ev.deltaY
@@ -132,7 +140,9 @@ EeSchema.prototype._init = function() {
 			    updateElement = true;
 				isPanning = true;
 	        }
-            else if(ev.type == 'panstart') {		
+            else*/ 
+            
+            if(ev.type == 'panstart') {		
 				startDraw = new Date().getTime();
                 isPanning = true;
             }
@@ -142,29 +152,24 @@ EeSchema.prototype._init = function() {
 	        }
 		    else if(ev.type == 'pinchend') {
 				isPinching = false;
-				doRedraw = true;
+				doRedraw = true;				
+				//isPanning = false;
 	        }   
 	        else if(ev.type == 'panend') {
 				if(!isPinching)
-					isPanning = false;
-				else
-					isPinching = false;
+    				isPanning = false;
+
+                isPinching = false;
 					
 				doRedraw = true;
 	        }
-
-			ees.transform.translate = {
-				    x: START_X + ev.deltaX,
-				    y: START_Y + ev.deltaY
-			};
 			
-			ees.transform.scale = initScale * ev.scale;
-			
-			if(doRedraw) {				
+			if(doRedraw) {
+			    redraw();	
 				updateElement = true;
 			}
 			
-			if(updateElement)
+			//if(updateElement)
 				requestElementUpdate();
 			
         }
@@ -177,14 +182,17 @@ EeSchema.prototype._init = function() {
 		var center = ees.fcanvas.getCenter();
 		startDraw = new Date().getTime();
 		
+		
 		if(ees.transform.scale != 1) {
 			ees.fcanvas.zoomToPoint(new fabric.Point(center.left, center.top), ees.transform.scale * ees.fcanvas.getZoom());
 			
 			if(isPinching) {
-				initScale = initScale/ees.transform.scale;			
+				initScale = initScale/ees.transform.scale;
+				ees.coords.html(ees.coords.html() + '[up]');	
 			}
 			else {
 				initScale = 1;
+				ees.coords.html(ees.coords.html() + '[rp]');
 			}
 		}
 		
@@ -198,6 +206,7 @@ EeSchema.prototype._init = function() {
 			else {
 				START_X = 0;
 				START_Y = 0;
+				initScale = 1;
 			}
 		}
 		
@@ -230,9 +239,9 @@ EeSchema.prototype._init = function() {
 	}
 	
 	function updateElementTransform() {
-		if(doRedraw) {
-			redraw();
-		}
+		//if(doRedraw) {
+		//	redraw();
+		//}
 	
 		var value = [
 			'translate3d(' + ees.transform.translate.x + 'px, ' + ees.transform.translate.y + 'px, 0)',
