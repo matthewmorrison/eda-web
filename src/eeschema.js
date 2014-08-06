@@ -18,7 +18,7 @@ function EeSchema(container) {
 	this.canvasContainer = $('<div class="eeschema-canvas-container" />');
 	this.coords = $('<div class="eeschema-coords" >Coords</div>');
 	this.canvasTouch = $('<div class="eeschema-canvas-touch" >');
-	this.target = $('<div class="debug" >24</div>');
+	this.target = $('<div class="debug" >25</div>');
 	this.scale = $('<div class="scale" >1</div>');
 	this.deltas = $('<div class="coords" >0, 0</div>');
 	this.redrawTime = $('<div class="redraw-time" >redraw</div>');
@@ -100,8 +100,11 @@ EeSchema.prototype._init = function() {
 			doRedraw = true;
 			requestElementUpdate();
 			
-			ees.coords.html(ees.coords.html() + '->' + ev.type);
+			ees.coords.html(ees.coords.html() + '->[IFinal');
 	    }
+		else if(ev.isFirst) {
+			ees.coords.html(ees.coords.html() + '->[IFirst');
+		}
 	});
 	
 	var initScale = 1;
