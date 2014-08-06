@@ -18,7 +18,7 @@ function EeSchema(container) {
 	this.canvasContainer = $('<div class="eeschema-canvas-container" />');
 	this.coords = $('<div class="eeschema-coords" >Coords</div>');
 	this.canvasTouch = $('<div class="eeschema-canvas-touch" >');
-	this.target = $('<div class="debug" >25</div>');
+	this.target = $('<div class="debug" >26</div>');
 	this.scale = $('<div class="scale" >1</div>');
 	this.deltas = $('<div class="coords" >0, 0</div>');
 	this.redrawTime = $('<div class="redraw-time" >redraw</div>');
@@ -78,8 +78,8 @@ EeSchema.prototype._init = function() {
 	var el = document.querySelector(".canvas-container");
 	
 	mc = new Hammer.Manager(document.querySelector(".eeschema-canvas-touch"));
-	//mc.add(new Hammer.Pan({ threshold: 0, pointers: 0 }));
-	mc.add(new Hammer.Pinch({ threshold: 0 }));//.recognizeWith([mc.get('pan')]);
+	mc.add(new Hammer.Pan({ threshold: 0, pointers: 0 }));
+	mc.add(new Hammer.Pinch({ threshold: 0 })).recognizeWith([mc.get('pan')]);
 	
 	mc
 	    .on("pinchstart pinchmove pinchend panstart panmove panend", onGesture);
@@ -91,19 +91,11 @@ EeSchema.prototype._init = function() {
 	})();
 	
 	mc.on("hammer.input", function(ev) {
-	    if(ev.isFinal) {
-	        resetElement();
+		if(ev.isFirst) {
+			ees.coords.html(ees.coords.html() + '->[IFirst');
 			initScale = 1;
 			START_X = 0;
 			START_Y = 0;
-			
-			doRedraw = true;
-			requestElementUpdate();
-			
-			ees.coords.html(ees.coords.html() + '->[IFinal');
-	    }
-		else if(ev.isFirst) {
-			ees.coords.html(ees.coords.html() + '->[IFirst');
 		}
 	});
 	
