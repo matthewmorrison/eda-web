@@ -91,7 +91,6 @@ EeSchema.prototype._init = function() {
 	
 	mc.on("hammer.input", function(ev) {
 		if(ev.isFirst) {
-			//ees.coords.html(ees.coords.html() + '->[IFirst');
 			initScale = 1;
 			START_X = 0;
 			START_Y = 0;
@@ -105,24 +104,6 @@ EeSchema.prototype._init = function() {
 	function onGesture(ev) {
 	    try {
 			doRedraw = new Date() - startDraw > 2000;
-
-			/*ees.scale.html(ev.scale);
-			ees.deltas.html(ev.deltaX + ', ' + ev.deltaY);
-	        if(ev.type == 'pinchstart'
-	        || ev.type == 'pinchend'
-	        || ev.type == 'panstart'
-	        || ev.type == 'panend'
-			|| ev.type == 'pinchcancel'
-			|| ev.type == 'pancancel') {
-	            var l = '' + ev.scale;
-	            if(ev.isFirst)
-	            	l += '[isFirst]';
-	            
-	            if(ev.isFinal)
-	            	l += '[isFinal]';
-	            
-	            ees.coords.html(ees.coords.html() + '->' + ev.type + l);
-	        }*/
 	        
 			ees.transform.translate = {
 				    x: START_X + ev.deltaX,
@@ -253,21 +234,9 @@ EeSchema.prototype._init = function() {
 	this.canvasTouch.on('mousemove', function(e) {
 		ees.fcanvas.mouseX = e.clientX;
 		ees.fcanvas.mouseY = e.clientY;
+		var zoom = ees.fcanvas.getZoom();
+		ees.coords.html((e.clientX/zoom - ees.fcanvas.viewportTransform[4]/zoom) + ', ' + (e.clientY/zoom - ees.fcanvas.viewportTransform[5]/zoom));
 	});
-}
-
-EeSchema.prototype._initMobile = function() {
-
-}
-
-EeSchema.prototype.canvasDrag = function(e) {
-	if(this.dragStatus != 'dragging')
-		this.dragStatus = 'dragging';
-	
-	var x = this.dragStart[0] - this.fcanvas.mouseX  - this.dragPanStart[0];
-	var y = this.dragStart[1] - this.fcanvas.mouseY - this.dragPanStart[1];
-		
-	absolutePan(new fabric.Point(x, y));
 }
 
 function getScrollbarWidth() {
@@ -403,14 +372,21 @@ EeSchema.prototype.parseComponent = function(lines) {
 				comp.x = props[1]/1;
 				comp.y = props[2]/1;
 			}
+			else if(props[0] == 'F') {
+				// TODO: fields
+			}
+			else if(props[0] == '\t') {
+				l_index++; // Skip first placement properties as they are redundant x,y
+				// TODO: rotation matrix
+			}
 			else if(props[0] == '$EndComp') {
 				break;
 			}
 		}
 	}
 	
-	if(comp.definition != null) {
-		comp.fabric = comp.definition.Create(center);
+	if(comp.definition != null) {	
+		comp.fabric = comp.definition.Create();
 		comp.fabric.selectable = false;
 		this.fcanvas.add(comp.fabric);
 		comp.fabric.setLeft(comp.x);
