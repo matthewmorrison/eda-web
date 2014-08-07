@@ -81,8 +81,8 @@ function EeSchema(container) {
 	if(this.disableWorkers || typeof(Worker) === 'undefined') {
 		this.workerStatus = 'loading';
 		this.deferredJobs = [];
-		
-		loadjscssfile(edaRoot + '/worker.js', 'js', function() {
+		console.log('loading ', edaRoot, 'worker.js');
+		loadjscssfile(edaRoot + 'worker.js', 'js', function() {
 			ees.workerStatus = 'unsupported';
 			
 			for(var i in ees.deferredJobs) {
