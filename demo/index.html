@@ -63,12 +63,11 @@
                     loadjscssfile('../libs/hammer.js', 'js', function() { loadedJs('hammer') });   
             }
             else {
-                loadjscssfile('//rawgit.com/matthewmorrison/eda-web/master/src/eeschema-component.js', 'js', function() { loadedJs('eeschema-component') });
-                loadjscssfile('//rawgit.com/matthewmorrison/eda-web/master/src/eeschema.js?t', 'js', function() { loadedJs('eeschema') });
-                //loadjscssfile('//rawgit.com/matthewmorrison/eda-web/master/libs/jquery.mousewheel.min.js', 'js', function() { loadedJs('eeschema') });
-                
-                //if('ontouchstart' in window)
-                    loadjscssfile('//rawgit.com/matthewmorrison/eda-web/master/libs/hammer.js', 'js', function() { loadedJs('hammer') });   
+				window['edaRoot'] = '//rawgit.com/matthewmorrison/eda-web/master/src';
+                loadjscssfile(edaRoot + '/eeschema-component.js', 'js', function() { loadedJs('eeschema-component') });
+                loadjscssfile(edaRoot + '/eeschema.js?t', 'js', function() { loadedJs('eeschema') });
+                loadjscssfile('//rawgit.com/matthewmorrison/eda-web/master/libs/jquery.mousewheel.min.js', 'js', function() { loadedJs('eeschema') });
+                loadjscssfile('//rawgit.com/matthewmorrison/eda-web/master/libs/hammer.js', 'js', function() { loadedJs('hammer') });   
             }
         });
     </script>
@@ -3335,7 +3334,7 @@ var stereo_camera_board = 'EESchema-LIBRARY Version 2.3  Date: 7/21/2014 9:51:47
 'F3 "" 0 0 60 H V C CNN\r\n' + 
 'DRAW\r\n' + 
 'X pwr 1 0 0 0 U 20 20 0 0 w\r\n' + 
-'P 3 0 1 0  0 0  0 100  0 100 N\r\n' + 
+'P 3 0 1 0 0 0 0 100 0 100 N\r\n' + 
 'P 5 0 1 0  0 100  -100 150  0 200  100 150  0 100 N\r\n' + 
 'ENDDRAW\r\n' + 
 'ENDDEF\r\n' + 
