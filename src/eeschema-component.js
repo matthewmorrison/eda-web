@@ -344,6 +344,15 @@ ComponentDefinition.prototype.Create = function() {
                 x0 = el.x0;
                 x1 = el.x1;
             }
+            
+            if(el.y0 > el.y1) {
+                y0 = el.y1;
+                y1 = el.y0;
+            }
+            else {
+                y0 = el.y0;
+                y1 = el.y1;
+            }
 		    
             var line1 = new fabric.Line([ el.x0, el.y0, el.x1, el.y0 ], {
 				stroke: 'black',
@@ -360,14 +369,14 @@ ComponentDefinition.prototype.Create = function() {
 				originY: 0
 			});
 			
-            var line3 = new fabric.Line([ el.x1, el.y1, el.x0, el.y1 ], {
+            var line3 = new fabric.Line([ el.x0, el.y1, el.x1, el.y1 ], {
 				stroke: 'black',
 				strokeWidth: el.thickness * this.widthFactor,
 				originX: 0,
 				originY: 0
 			});
 			
-            var line4 = new fabric.Line([ el.x0, el.y1, el.x0, el.y0 ], {
+            var line4 = new fabric.Line([ el.x0, el.y0, el.x0, el.y1 ], {
 				stroke: 'black',
 				strokeWidth: el.thickness * this.widthFactor,
 				originX: 0,
