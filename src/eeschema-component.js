@@ -153,10 +153,10 @@ ComponentDefinition.prototype.parseDrawField = function(props) {
 			'convert': props[7],
 			'thickness': props[8],
 			'cc': props[9],
-			'pX0': props[10],
-			'pY0': props[11],
-			'pX1': props[12],
-			'pY1': props[13]
+			'sX': props[10],
+			'sY': props[11],
+			'eX': props[12],
+			'eY': props[13]
 		});
 	}
 	else if(type == 'T') {
@@ -216,25 +216,29 @@ function describeArc(x, y, radius, startAngle, endAngle){
     return d;       
 }
 
-ComponentDefinition.prototype.Create = function(center) {	
+ComponentDefinition.prototype.Create = function(x, y) {	
 	var pinRadius = 16;
 	var width = 4;
+	var center = { left: 0, top: 0 };
 	
 	var group = new fabric.Group();
+	group.set({ originX: x, originY: y });
 	
 	for(var i = 0; i < this.elements.length; i++) {
 		var el = this.elements[i];
 		
 		if(el.type == 'P') {
 			var path = 'M ' + el.points[0][0] + ' ' + el.points[0][1] + 
-				' L ' + el.points[1][0] + ' ' + el.points[1][1] + ' z';
+				' L ' + el.points[1][0] + ' ' + el.points[1][1];
 			
 			for(var j = 2; j < el.points.length; j++) {
 				path += ' L ' + el.points[j][0] + ' ' + el.points[j][1];
 			}
 			
+			path += ' z';
+			
 			var path = new fabric.Path(path);
-			path.set({ fill: 'red', stroke: 'black', strokeWidth: 5, originX: center.left, originY: center.top });
+			path.set({ stroke: 'black', strokeWidth: 5, originX: center.left, originY: center.top });
 			path.hasBorders = path.hasControls = false;
 			group.addWithUpdate(path);
 		}
@@ -335,10 +339,6 @@ ComponentDefinition.prototype.Create = function(center) {
 				strokeWidth: 2,
 				originX: center.left, 
 				originY: center.top,
-/*				left: el.x0,
-				top: el.y0,
-				/*left: 0,
-				top: 0,*/
 				width: el.x1 - el.x0,
 				height: el.y1 - el.y0
 			});
@@ -349,11 +349,11 @@ ComponentDefinition.prototype.Create = function(center) {
 		else if(el.type == 'A') {		
 			var def = describeArc(el.x0, el.y0, el.radius, el.start/10, el.end/10);
 			
-			def = 'M' + el.x0 + ' ' + el.y0 + ' A 45 45, 0, 1, 1, 275 275 L 275 230 Z';
+			def = 'M' + el.sX + ' ' + el.sY + ' A' + el.radius + ' ' + el.radius + ' 0 0 1 ' + el.eX + ' ' + el.eY;
 			
 			var path = new fabric.Path(def);
 			path.hasBorders = path.hasControls = false;
-			path.set({ fill: 'red', stroke: 'black', strokeWidth: 5, originX: center.left, originY: center.top });
+			path.set({ stroke: 'black', strokeWidth: 5, originX: el.x0, originY: el.y0 });
 			group.addWithUpdate(path);
 		}
 	}
