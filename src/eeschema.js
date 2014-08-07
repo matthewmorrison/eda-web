@@ -82,7 +82,7 @@ function EeSchema(container) {
 		this.workerStatus = 'loading';
 		this.deferredJobs = [];
 		
-		loadjscssfile('worker.js', 'js', function() {
+		loadjscssfile(edaRoot + '/worker.js', 'js', function() {
 			ees.workerStatus = 'unsupported';
 			
 			for(var i in ees.deferredJobs) {
@@ -317,7 +317,7 @@ EeSchema.prototype.parseSchematic = function(txt) {
 		this.deferredJobs.push({ func: 'this.parseSchematic(arguments[0])', params: [txt] });
 	}
 	else {
-		var worker = new Worker('worker.js');
+		var worker = new Worker(edaRoot + 'worker.js');
 		
 		worker.postMessage({ action: 'parse-schematic', text: txt });
 		worker.addEventListener('message', function(e) {
