@@ -1,3 +1,23 @@
+function loadjscssfile(filename, filetype, onload){
+	 if (filetype=="js"){ //if filename is a external JavaScript file
+	  var fileref=document.createElement('script')
+	  fileref.setAttribute("type","text/javascript")
+	  fileref.setAttribute("src", filename)
+	 }
+	 else if (filetype=="css"){ //if filename is an external CSS file
+	  var fileref=document.createElement("link")
+	  fileref.setAttribute("rel", "stylesheet")
+	  fileref.setAttribute("type", "text/css")
+	  fileref.setAttribute("href", filename)
+	 }
+	 if (typeof fileref!="undefined") {
+	  if(typeof onload == 'function') {
+		fileref.onload = onload;
+	  }
+	  document.getElementsByTagName("head")[0].appendChild(fileref)
+	 }
+}
+
 function EeSchema(container) {
     this.container = $(container);
 	this.canvasScale = 1;
@@ -8,7 +28,6 @@ function EeSchema(container) {
 	this.libraries = {};
 	this.components = [];
 	this.wires = []; // and buses
-	this.junctions = [];
     this.dragStatus = 'none'
     this.canvas = $('<canvas />');
 	this.rightPanel = $('<div class="eeschema-panel-right" />');
@@ -22,6 +41,10 @@ function EeSchema(container) {
 	this.scale = $('<div class="scale" >1</div>');
 	this.deltas = $('<div class="coords" >0, 0</div>');
 	this.redrawTime = $('<div class="redraw-time" >redraw</div>');
+	this.workerStatus = 'supported';
+	this.disableWorkers = false;
+	
+	this.schematic = {};
 
 	this.container.append(this.canvasContainer);
 	this.canvasContainer.append(this.canvas);
@@ -54,6 +77,24 @@ function EeSchema(container) {
 
 	this.fcanvas.setWidth(this.canvasContainer.width());
 	this.fcanvas.setHeight(this.canvasContainer.height());
+	
+	if(this.disableWorkers || typeof(Worker) === 'undefined') {
+		this.workerStatus = 'loading';
+		this.deferredJobs = [];
+		
+		loadjscssfile('worker.js', 'js', function() {
+			ees.workerStatus = 'unsupported';
+			
+			for(var i in ees.deferredJobs) {
+				var job = ees.deferredJobs[i];
+				console.log('running job: ', job);
+				var func = new Function(job.func);
+				console.log(func);
+				
+				func.apply(ees, job.params);
+			}
+		});
+	}
 }
 
 EeSchema.prototype._init = function() {
@@ -264,12 +305,28 @@ EeSchema.prototype.open = function(location) {
 	})
 	.done(function(response) {
 		console.log('Response: ', response);
+		
 		this.parseSchematic(response);
 	});
 }
 
 EeSchema.prototype.parseSchematic = function(txt) {
-	var lines = txt.split('\n');
+	var ees = this;
+	if(this.workerStatus == 'loading') {
+		console.log('worker loading');
+		this.deferredJobs.push({ func: 'this.parseSchematic(arguments[0])', params: [txt] });
+	}
+	else {
+		var worker = new Worker('worker.js');
+		
+		worker.postMessage({ action: 'parse-schematic', text: txt });
+		worker.addEventListener('message', function(e) {
+			ees.handleMessage(e.data);
+		});
+	}
+
+	return;
+	/*var lines = txt.split('\n');
 	var section = '';
 
 	for(var l_index = 0; l_index < lines.length; l_index++) {
@@ -300,7 +357,7 @@ EeSchema.prototype.parseSchematic = function(txt) {
 				l_index += this.parseComponent(lines.slice(l_index));
 			}
 			else if(props[0] == 'Wire' || props[0] == 'Entry') {
-                continue
+                //continue
                     
 				var wire = {
 					type: props[0],
@@ -318,11 +375,13 @@ EeSchema.prototype.parseSchematic = function(txt) {
 				wire.x1 = props[2];
 				wire.y1 = props[3];
 
-				var l = new fabric.Line([ /*wire.x0, wire.y0,*/ 0, 0, wire.x1, wire.y1 ], {
+				var l = new fabric.Line([ wire.x0, wire.y0, wire.x1, wire.y1 ], {
 					stroke: 'black',
 					strokeWidth: 1,
 					left: wire.x0,
-					top: wire.y0
+					top: wire.y0,
+					originX: wire.x0,
+					originY: wire.y0
 				});
 				
 				l.lineType = wire.type;
@@ -338,9 +397,52 @@ EeSchema.prototype.parseSchematic = function(txt) {
 	console.log('Done parsing schematic: ', new Date());
 
 	
-	this.resetView();
+	this.resetView();*/
 }
 
+EeSchema.prototype.handleMessage = function(data) {
+	switch(data.action) {
+		case 'schematic-description':
+			this.schematic.description = data.description;
+			this.resetView();
+			break;
+		case 'schematic-component':
+			if(typeof this.libraries[data.component.library] != 'undefined') {
+				data.component.definition = this.libraries[data.component.library];
+				this.drawComponent(data.component);
+			}
+			else {
+				console.log('Unable to find definition for component: ', data.component.library);
+			}
+			
+			this.components.push(data.component);
+			break;
+		case 'schematic-wire':
+			break;
+			var wire = data.wire;
+			var l = new fabric.Line([ wire.x0, wire.y0, wire.x1, wire.y1 ], {
+				stroke: 'black',
+				strokeWidth: 1,
+				left: wire.x0,
+				top: wire.y0,
+				originX: wire.x0,
+				originY: wire.y0
+			});
+				
+			l.lineType = wire.type;
+			l.linePurpose = wire.purpose;
+			l.lineCharacteristic = wire.characteristic;
+			
+			this.fcanvas.add(l);
+			this.wires.push(l);
+			break;
+		case 'schematic-complete':
+			//this.resetView();
+			break;
+	}
+}
+
+/*
 EeSchema.prototype.parseComponent = function(lines) {
 	var l_index = 0;
 	var center = this.fcanvas.getCenter();
@@ -396,7 +498,7 @@ EeSchema.prototype.parseComponent = function(lines) {
 	this.components.push(comp);
 	
 	return l_index;
-}
+}*/
 
 EeSchema.prototype.parseLibrary = function(txt) {
 	var lines = txt.split('\n');
@@ -426,6 +528,14 @@ EeSchema.prototype.parseLibrary = function(txt) {
 	}
 }
 
+EeSchema.prototype.drawComponent = function(comp) {
+	comp.fabric = comp.definition.Create();
+	comp.fabric.selectable = false;
+	this.fcanvas.add(comp.fabric);
+	comp.fabric.setLeft(comp.x);
+	comp.fabric.setTop(comp.y);
+}
+
 EeSchema.prototype.zoomIn = function() {
 		// TODO limit the max canvas zoom in
 		var x = this.fcanvas.mouseX;
@@ -448,8 +558,8 @@ EeSchema.prototype.zoomOut = function() {
 EeSchema.prototype.updatePan = function(allowOverPan) {
 return;
 	var zoom = this.fcanvas.getZoom();
-	var zoomW = zoom * this.sheetWidth;
-    var zoomH = zoom * this.sheetHeight;
+	var zoomW = zoom * this.schematic.description.sheetWidth;
+    var zoomH = zoom * this.schematic.description.sheetHeight;
     
     if(allowOverPan) {
 	    if(this.fcanvas.viewportTransform[4] < 0)
@@ -464,22 +574,19 @@ return;
 	
 	this.panner.scrollLeft(-1 * this.fcanvas.viewportTransform[4]);
 	this.panner.scrollTop(-1 * this.fcanvas.viewportTransform[5]);
-	
-	//this.zoomer.css('left', this.panner.scrollLeft());
-	//this.zoomer.css('top', this.panner.scrollTop());
 }
 
 EeSchema.prototype.recalcScroll = function() {
-	var dwidth = this.fcanvas.getWidth()/this.sheetWidth;
-	var dheight = this.fcanvas.getHeight()/this.sheetHeight;
+	var dwidth = this.fcanvas.getWidth()/this.schematic.description.sheetWidth;
+	var dheight = this.fcanvas.getHeight()/this.schematic.description.sheetHeight;
 }
 	
 EeSchema.prototype.resetView = function() {
 	var width = this.fcanvas.getWidth();
 	var height = this.fcanvas.getHeight()
 	var fit = 1;
-	var hRatio = width / this.sheetWidth;
-	var vRatio = height / this.sheetHeight;
+	var hRatio = width / this.schematic.description.sheetWidth;
+	var vRatio = height / this.schematic.description.sheetHeight;
 	var left = 0;
 	var top = 0;
 	
