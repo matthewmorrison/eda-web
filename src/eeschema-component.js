@@ -11,6 +11,7 @@ function ComponentDefinition(fabric_canvas) {
 	this.fields = {};
 	this.elements = [];
 	this.fcanvas = fabric_canvas;
+	this.widthFactor = 4;
 }
 
 ComponentDefinition.prototype.parse = function(def) {			
@@ -119,10 +120,10 @@ ComponentDefinition.prototype.parseDrawField = function(props) {
 	else if(type == 'S'){ // rectangle (square)
 		this.elements.push({
 			'type': type, 
-			'x0': props[1],
-			'y0': props[2], 
-			'x1': props[3], 
-			'y1': props[4],
+			'x0': parseInt(props[1]),
+			'y0': parseInt(props[2]), 
+			'x1': parseInt(props[3]), 
+			'y1': parseInt(props[4]),
 			'unit': props[5], 
 			'convert': props[6],
 			'thickness': props[7],
@@ -152,7 +153,7 @@ ComponentDefinition.prototype.parseDrawField = function(props) {
 			'part': props[6],
 			'convert': props[7],
 			'thickness': props[8],
-			'cc': props[9],
+			'cc': props[9].trim(),
 			'sX': props[10],
 			'sY': props[11],
 			'eX': props[12],
@@ -216,13 +217,13 @@ function describeArc(x, y, radius, startAngle, endAngle){
     return d;       
 }
 
-ComponentDefinition.prototype.Create = function(x, y) {	
+ComponentDefinition.prototype.Create = function() {	
 	var pinRadius = 16;
 	var width = 4;
 	var center = { left: 0, top: 0 };
+	console.log(this.name);
 	
 	var group = new fabric.Group();
-	group.set({ originX: x, originY: y });
 	
 	for(var i = 0; i < this.elements.length; i++) {
 		var el = this.elements[i];
@@ -238,7 +239,7 @@ ComponentDefinition.prototype.Create = function(x, y) {
 			path += ' z';
 			
 			var path = new fabric.Path(path);
-			path.set({ stroke: 'black', strokeWidth: 5, originX: center.left, originY: center.top });
+			path.set({ stroke: 'black', strokeWidth: this.widthFactor, originX: center.left, originY: center.top });
 			path.hasBorders = path.hasControls = false;
 			group.addWithUpdate(path);
 		}
@@ -323,9 +324,9 @@ ComponentDefinition.prototype.Create = function(x, y) {
 				radius: el.radius, 
 				fill: (el.cc == 'N' ? 'transparent' : 'white'), 
 				stroke: 'black',
-				strokeWidth: 2, 
-				originX: center.left, 
-				originY: center.top,
+				strokeWidth: el.thickness * this.widthFactor, 
+				originX: 0, 
+				originY: 0,
 				left: el.x0,
 				top: el.y0 });
 			
@@ -333,18 +334,72 @@ ComponentDefinition.prototype.Create = function(x, y) {
 			group.addWithUpdate(circle);
 		}
 		else if(el.type == 'S') {
-			var rect = new fabric.Rect({
-				fill: 'transparent',
+		    var x0, x1, y0, y1;
+		    
+		    if(el.x0 > el.x1) {
+		        x0 = el.x1;
+		        x1 = el.x0;
+            }
+            else {
+                x0 = el.x0;
+                x1 = el.x1;
+            }
+		    
+            var line1 = new fabric.Line([ el.x0, el.y0, el.x1, el.y0 ], {
 				stroke: 'black',
-				strokeWidth: 2,
-				originX: center.left, 
-				originY: center.top,
-				width: el.x1 - el.x0,
-				height: el.y1 - el.y0
+				strokeWidth: el.thickness * this.widthFactor,
+				originX: 0,
+				originY: 0
 			});
 			
-			rect.hasBorders = rect.hasControls = false;
-			group.addWithUpdate(rect);
+			
+			var line2 = new fabric.Line([ el.x1, el.y0, el.x1, el.y1 ], {
+				stroke: 'black',
+				strokeWidth: el.thickness * this.widthFactor,
+				originX: 0,
+				originY: 0
+			});
+			
+            var line3 = new fabric.Line([ el.x1, el.y1, el.x0, el.y1 ], {
+				stroke: 'black',
+				strokeWidth: el.thickness * this.widthFactor,
+				originX: 0,
+				originY: 0
+			});
+			
+            var line4 = new fabric.Line([ el.x0, el.y1, el.x0, el.y0 ], {
+				stroke: 'black',
+				strokeWidth: el.thickness * this.widthFactor,
+				originX: 0,
+				originY: 0
+			});
+
+/*			var rect = new fabric.Rect({
+				fill: 'transparent',
+				stroke: 'red',
+				strokeWidth: 2,
+				left: left, 
+				top: top,
+				width: swidth,
+				height: sheight
+			});*/
+			
+			if(this.name == 'GSB311231HR') {
+			console.log('purple');
+			  //  rect.set({ stroke: 'purple' });
+			}
+			
+			//console.log(el.x0, el.y0, el.x1, el.y1, swidth, sheight);
+			
+			//rect.set({ strokeWidth: 5, originX: center.left, originY: center.top });
+			
+			//rect.hasBorders = rect.hasControls = false;
+			//group.addWithUpdate(rect);
+			
+			group.addWithUpdate(line1);
+			group.addWithUpdate(line2);
+			group.addWithUpdate(line3);
+			group.addWithUpdate(line4);
 		}
 		else if(el.type == 'A') {		
 			var def = describeArc(el.x0, el.y0, el.radius, el.start/10, el.end/10);
@@ -353,7 +408,14 @@ ComponentDefinition.prototype.Create = function(x, y) {
 			
 			var path = new fabric.Path(def);
 			path.hasBorders = path.hasControls = false;
-			path.set({ stroke: 'black', strokeWidth: 5, originX: el.x0, originY: el.y0 });
+			path.set({ 
+			    stroke: 'black',
+			    strokeWidth: this.widthFactor,
+			    originX: el.x0, 
+			    originY: el.y0,
+                fill: el.cc == 'N' ? 'transparent' : 'black'
+			});
+			
 			group.addWithUpdate(path);
 		}
 	}
