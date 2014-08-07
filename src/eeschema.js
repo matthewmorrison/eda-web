@@ -41,8 +41,8 @@ function EeSchema(container) {
 	this.scale = $('<div class="scale" >1</div>');
 	this.deltas = $('<div class="coords" >0, 0</div>');
 	this.redrawTime = $('<div class="redraw-time" >redraw</div>');
-	this.workerStatus = 'supported';
-	this.disableWorkers = false;
+	this.workerStatus =  (typeof(Worker) === 'undefined') ? 'unsupported' : 'supported';
+	this.disableWorkers = !(window.location.href.indexOf('disableWorkers=T') == -1 && this.workerStatus == 'supported');
 	
 	this.schematic = {};
 
@@ -78,7 +78,7 @@ function EeSchema(container) {
 	this.fcanvas.setWidth(this.canvasContainer.width());
 	this.fcanvas.setHeight(this.canvasContainer.height());
 	
-	if(this.disableWorkers || typeof(Worker) === 'undefined') {
+	if(this.disableWorkers) {
 		this.workerStatus = 'loading';
 		this.deferredJobs = [];
 		console.log('loading ', edaRoot, 'worker.js');
