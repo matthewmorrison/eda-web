@@ -17,6 +17,28 @@ function loadjscssfile(filename, filetype, onload){
 	  document.getElementsByTagName("head")[0].appendChild(fileref)
 	 }
 }
+/*
+fabric.Object.prototype.setCoords = function() {
+	var worker = new Worker('worker.js');
+	var canvas = this.canvas;
+	var obj = this;
+
+	this.canvas = null;
+	worker.postMessage({ action: 'set-coords', fabric: this, viewportTransform: this.getViewportTransform() });
+	worker.addEventListener('message', function(e) {
+		if(e.data.action == 'coords-set') {
+			obj.currentWidth = e.data.fabric.currentWidth;
+			obj.currentHeight = e.data.fabric.currentHeight;
+			obj.oCoords = e.data.fabric.oCoords;
+			obj.coords = e.data.fabric.coords;
+			//obj.render();
+			
+			worker.close();
+		}
+	});
+	
+	this.canvas = canvas;
+}*/
 
 function EeSchema(container) {
     this.container = $(container);
@@ -43,6 +65,7 @@ function EeSchema(container) {
 	this.redrawTime = $('<div class="redraw-time" >redraw</div>');
 	this.workerStatus =  (typeof(Worker) === 'undefined') ? 'unsupported' : 'supported';
 	this.disableWorkers = !(window.location.href.indexOf('disableWorkers=T') == -1 && this.workerStatus == 'supported');
+	this.motionContainer = $('<div class="eeschema-motion-container" />');
 	
 	this.schematic = {};
 
@@ -54,8 +77,55 @@ function EeSchema(container) {
 
 	this.container.append(this.rightPanel);
 	this.rightPanel.append(this.testButton);
-	this.testButton.on('click', function() {
-		ees.resetView();
+	this.testButton.on('click', function() {		
+		var objects = ees.fcanvas.getObjects();
+		var remaining = objects.length;
+		var start = new Date().getTime();
+		for(var i = 0; i < objects.length; i++) {	
+			var obj = objects[i];
+			obj.setCoords();
+			ees.fcanvas.renderAll();
+			continue;
+			//obj.setCoords();
+			//continue;
+			
+			var canvas = obj.canvas;
+			var worker = new Worker('worker.js');
+			
+			obj.canvas = null;
+			worker.postMessage({ action: 'set-coords', fabric: obj, viewportTransform: obj.getViewportTransform() });
+			worker.addEventListener('message', function(e) {
+				if(e.data.action == 'coords-set') {
+					obj.currentWidth = e.data.fabric.currentWidth;
+					obj.currentHeight = e.data.fabric.currentHeight;
+					obj.oCoords = e.data.fabric.oCoords;
+					obj.coords = e.data.fabric.coords;
+					remaining--;
+					
+					if(remaining < 1) {
+						//obj.render();
+						//ees.fcanvas.renderAll();
+						console.log('done: ', new Date().getTime() - start);
+					}
+				}
+			});
+			
+			obj.canvas = canvas;
+		}
+		console.log('loop: ', new Date().getTime() - start);
+	
+	
+		/*var start = new Date().getTime();
+		var svg = 'data:image/svg+xml;base64,' + btoa(ees.fcanvas.toSVG());
+		console.log(svg);
+		var img = $('<img />');
+		
+		ees.canvasTouch.css('background-image', 'url(' + svg + ')');
+		
+		//img.attr('src', svg);
+		//ees.canvasTouch.append(img);
+		var rt = new Date().getTime() - start;
+		ees.redrawTime.html('<span>' + rt + '</span>');*/
 	});
 	
 	this.rightPanel.append(this.target);
@@ -66,6 +136,7 @@ function EeSchema(container) {
 	this.container.append(this.bottomPanel);
 	this.bottomPanel.append(this.coords);
 	this.fcanvas = new fabric.Canvas(this.canvas.get(0));
+	this.canvasContainer.append(this.motionContainer);
 	this.canvasContainer.append(this.canvasTouch);
 
 	this._init();
@@ -81,7 +152,7 @@ function EeSchema(container) {
 	if(this.disableWorkers) {
 		this.workerStatus = 'loading';
 		this.deferredJobs = [];
-		console.log('loading ', edaRoot, 'worker.js');
+		console.log('Not using workers. Loading ', edaRoot, 'worker.js');
 		loadjscssfile(edaRoot + 'worker.js', 'js', function() {
 			ees.workerStatus = 'unsupported';
 			
@@ -105,6 +176,8 @@ EeSchema.prototype._init = function() {
 	var ticking = false;
 	var isPinching = false;
 	var isPanning = false;
+	var containerWidth = 0;
+	var containerHeight = 0;
 	
 	ees.transform = {
 		translate: { x: START_X, y: START_Y },
@@ -116,7 +189,8 @@ EeSchema.prototype._init = function() {
 	};
 	
 	var timer;	
-	var el = document.querySelector(".canvas-container");
+	//var el = document.querySelector(".canvas-container");
+	var el = document.querySelector(".eeschema-motion-container");
 	
 	mc = new Hammer.Manager(document.querySelector(".eeschema-canvas-touch"));
 	mc.add(new Hammer.Pan({ threshold: 0, pointers: 0 }));
@@ -135,6 +209,36 @@ EeSchema.prototype._init = function() {
 			initScale = 1;
 			START_X = 0;
 			START_Y = 0;
+			containerWidth = ees.canvasTouch.width();
+			containerHeight = ees.canvasTouch.height();
+			
+			var start = new Date().getTime();
+			
+			var zoom = ees.fcanvas.getZoom();
+			var svg = ees.fcanvas.toSVG();
+			
+			ees.fcanvas.setZoom(zoom);
+			
+			//ees.motionContainer.html(svg);
+			
+			svg = 'data:image/svg+xml;base64,' + btoa(svg);
+			//console.log(svg);
+			ees.motionContainer.css('background-image', 'url(' + svg + ')');
+			
+			/*var img = $('<img />');
+			
+			img.attr('src', svg);
+			
+			var z = ees.motionContainer.width()/zoom;
+			console.log(z);
+			
+			ees.motionContainer.append(img);*/
+			var rt = new Date().getTime() - start;
+			ees.redrawTime.html('<span>' + rt + '</span>');
+		}
+		else if(ev.isFinal) {
+			redraw();
+			requestElementUpdate();
 		}
 	});
 	
@@ -144,12 +248,16 @@ EeSchema.prototype._init = function() {
 	   
 	function onGesture(ev) {
 	    try {
-			doRedraw = new Date() - startDraw > 2000;
+			doRedraw = new Date().getTime() - startDraw > 2000;
 	        
 			ees.transform.translate = {
 				    x: START_X + ev.deltaX,
 				    y: START_Y + ev.deltaY
 			};
+			
+			if(ev.type == 'panmove') {
+				ees.transform.scale += .01;
+			}
 			
 			if(isPinching) {
 			    ees.transform.scale = initScale * ev.scale;
@@ -180,7 +288,7 @@ EeSchema.prototype._init = function() {
 //			    redraw();	
 				updateElement = true;
 			}
-			
+			doRedraw = false;
 			requestElementUpdate();
 			
         }
@@ -198,11 +306,9 @@ EeSchema.prototype._init = function() {
 			
 			if(isPinching) {
 				initScale = initScale/ees.transform.scale;
-				ees.coords.html(ees.coords.html() + '[up]');	
 			}
 			else {
 				initScale = 1;
-				ees.coords.html(ees.coords.html() + '[rp]');
 			}
 		}
 		
@@ -233,7 +339,7 @@ EeSchema.prototype._init = function() {
 	
 		var value = [
 			'translate3d(' + ees.transform.translate.x + 'px, ' + ees.transform.translate.y + 'px, 0)',
-			'scale(' + ees.transform.scale + ', ' + ees.transform.scale + ')',
+			//'scale(' + ees.transform.scale + ', ' + ees.transform.scale + ')',
 			'rotate3d('+ ees.transform.rx +','+ ees.transform.ry +','+ ees.transform.rz +','+  ees.transform.angle + 'deg)'
 		];
 
@@ -241,6 +347,8 @@ EeSchema.prototype._init = function() {
 		el.style.webkitTransform = value;
 		el.style.mozTransform = value;
 		el.style.transform = value;
+		el.style.width = parseInt(ees.transform.scale * containerWidth) + 'px';
+		el.style.height = parseInt(ees.transform.scale * containerHeight) + 'px';
 		ticking = false;
 	}
 
@@ -529,11 +637,11 @@ EeSchema.prototype.parseLibrary = function(txt) {
 }
 
 EeSchema.prototype.drawComponent = function(comp) {
-	comp.fabric = comp.definition.Create();
+	comp.fabric = comp.definition.Create(comp.x, comp.y);
 	comp.fabric.selectable = false;
 	this.fcanvas.add(comp.fabric);
-	comp.fabric.setLeft(comp.x);
-	comp.fabric.setTop(comp.y);
+	//comp.fabric.setLeft(comp.x);
+	//comp.fabric.setTop(comp.y);
 }
 
 EeSchema.prototype.zoomIn = function() {
