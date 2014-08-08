@@ -17,28 +17,6 @@ function loadjscssfile(filename, filetype, onload){
 	  document.getElementsByTagName("head")[0].appendChild(fileref)
 	 }
 }
-/*
-fabric.Object.prototype.setCoords = function() {
-	var worker = new Worker('worker.js');
-	var canvas = this.canvas;
-	var obj = this;
-
-	this.canvas = null;
-	worker.postMessage({ action: 'set-coords', fabric: this, viewportTransform: this.getViewportTransform() });
-	worker.addEventListener('message', function(e) {
-		if(e.data.action == 'coords-set') {
-			obj.currentWidth = e.data.fabric.currentWidth;
-			obj.currentHeight = e.data.fabric.currentHeight;
-			obj.oCoords = e.data.fabric.oCoords;
-			obj.coords = e.data.fabric.coords;
-			//obj.render();
-			
-			worker.close();
-		}
-	});
-	
-	this.canvas = canvas;
-}*/
 
 function EeSchema(container) {
     this.container = $(container);
@@ -419,7 +397,7 @@ EeSchema.prototype.open = function(location) {
 }
 
 EeSchema.prototype.parseSchematic = function(txt) {
-	var ees = this;
+	/*var ees = this;
 	if(this.workerStatus == 'loading') {
 		console.log('worker loading');
 		this.deferredJobs.push({ func: 'this.parseSchematic(arguments[0])', params: [txt] });
@@ -433,8 +411,9 @@ EeSchema.prototype.parseSchematic = function(txt) {
 		});
 	}
 
-	return;
-	/*var lines = txt.split('\n');
+	return;*/
+	
+	var lines = txt.split('\n');
 	var section = '';
 
 	for(var l_index = 0; l_index < lines.length; l_index++) {
@@ -457,9 +436,9 @@ EeSchema.prototype.parseSchematic = function(txt) {
 				});
 			}
 			else if(props[0] == '$Descr') {
-				this.sheetSize = props[1];
-				this.sheetWidth = props[2];
-				this.sheetHeight = props[3];
+				this.schematic.description.sheetSize = props[1];
+				this.schematic.description.sheetWidth = props[2];
+				this.schematic.description.sheetHeight = props[3];
 			}
 			else if(props[0] == '$Comp') {
 				l_index += this.parseComponent(lines.slice(l_index));
@@ -505,7 +484,7 @@ EeSchema.prototype.parseSchematic = function(txt) {
 	console.log('Done parsing schematic: ', new Date());
 
 	
-	this.resetView();*/
+	this.resetView();
 }
 
 EeSchema.prototype.handleMessage = function(data) {
@@ -550,7 +529,7 @@ EeSchema.prototype.handleMessage = function(data) {
 	}
 }
 
-/*
+
 EeSchema.prototype.parseComponent = function(lines) {
 	var l_index = 0;
 	var center = this.fcanvas.getCenter();
@@ -606,7 +585,7 @@ EeSchema.prototype.parseComponent = function(lines) {
 	this.components.push(comp);
 	
 	return l_index;
-}*/
+}
 
 EeSchema.prototype.parseLibrary = function(txt) {
 	var lines = txt.split('\n');
