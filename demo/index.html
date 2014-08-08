@@ -2,8 +2,8 @@
 <html>
 <head>
 	<meta name="viewport" content="user-scalable=no, width=device-width, initial-scale=1, maximum-scale=1">
-	<script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/2.1.1/jquery.min.js" ></script> 
-	<script src="https://cdnjs.cloudflare.com/ajax/libs/fabric.js/1.4.8/fabric.min.js" ></script>
+	<script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/2.1.1/jquery.min.js" ></script>
+	<!--<script src="https://cdnjs.cloudflare.com/ajax/libs/fabric.js/1.4.8/fabric.min.js" ></script>-->
 
     <script>
         function loadjscssfile(filename, filetype, onload){
@@ -55,6 +55,7 @@
 			}
 		
             if(window.location.host.indexOf('192') == 0 || window.location.host == 'localhost' || window.location.protocol == 'file:') {
+				loadjscssfile('../libs/fabric.js', 'js', function() { loadedJs('hammer') })
                 loadjscssfile('eeschema-component.js?t=' + new Date().getTime(), 'js', function() { loadedJs('eeschema-component') });
                 loadjscssfile('eeschema.js?t=' + new Date().getTime(), 'js', function() { loadedJs('eeschema') });
                 loadjscssfile('../libs/jquery.mousewheel.min.js', 'js', function() { loadedJs('eeschema') });
@@ -64,6 +65,7 @@
             }
             else {
 				edaRoot = '//rawgit.com/matthewmorrison/eda-web/master/src/';
+				loadjscssfile(edaRoot + '../libs/fabric.js', 'js', function() { loadedJs('eeschema-component') });
                 loadjscssfile(edaRoot + 'eeschema-component.js', 'js', function() { loadedJs('eeschema-component') });
                 loadjscssfile(edaRoot + 'eeschema.js?t', 'js', function() { loadedJs('eeschema') });
                 loadjscssfile('//rawgit.com/matthewmorrison/eda-web/master/libs/jquery.mousewheel.min.js', 'js', function() { loadedJs('eeschema') });
@@ -108,7 +110,6 @@
         
         .eeschema canvas {
             position: absolute;
-/*            margin: 1000px 0;*/
             height: 100%;
         }
         
@@ -130,14 +131,19 @@
 			white-space: nowrap;
 		}
 		
-		.eeschema-canvas-touch {
+		.eeschema-canvas-touch, .eeschema-motion-container {
 		    position: absolute;
 		    width: 100%;
 		    height: 100%;
 		    top: 0;
 		    left: 0;
-		    
+			background-size: cover;
         }
+		
+		.eeschema-motion-container img {
+			position: absolute;
+			width: 100%;
+		}
 	</style>
 </head>
 <body>	
