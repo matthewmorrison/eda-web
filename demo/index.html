@@ -55,7 +55,7 @@
 			}
 		
             if(window.location.host.indexOf('192') == 0 || window.location.host == 'localhost' || window.location.protocol == 'file:') {
-				loadjscssfile('../libs/fabric.js', 'js', function() { loadedJs('hammer') })
+				loadjscssfile('../libs/fabric.js', 'js', function() { loadedJs('fabric') })
                 loadjscssfile('eeschema-component.js?t=' + new Date().getTime(), 'js', function() { loadedJs('eeschema-component') });
                 loadjscssfile('eeschema.js?t=' + new Date().getTime(), 'js', function() { loadedJs('eeschema') });
                 loadjscssfile('../libs/jquery.mousewheel.min.js', 'js', function() { loadedJs('eeschema') });
@@ -65,7 +65,7 @@
             }
             else {
 				edaRoot = '//rawgit.com/matthewmorrison/eda-web/master/src/';
-				loadjscssfile(edaRoot + '../libs/fabric.js', 'js', function() { loadedJs('eeschema-component') });
+				loadjscssfile(edaRoot + '../libs/fabric.js', 'js', function() { loadedJs('fabric') });
                 loadjscssfile(edaRoot + 'eeschema-component.js', 'js', function() { loadedJs('eeschema-component') });
                 loadjscssfile(edaRoot + 'eeschema.js?t', 'js', function() { loadedJs('eeschema') });
                 loadjscssfile('//rawgit.com/matthewmorrison/eda-web/master/libs/jquery.mousewheel.min.js', 'js', function() { loadedJs('eeschema') });
