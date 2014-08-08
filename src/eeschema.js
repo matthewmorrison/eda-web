@@ -233,10 +233,6 @@ EeSchema.prototype._init = function() {
 				    y: START_Y + ev.deltaY
 			};
 			
-			if(ev.type == 'panmove') {
-				ees.transform.scale += .01;
-			}
-			
 			if(isPinching) {
 			    ees.transform.scale = initScale * ev.scale;
 			}
