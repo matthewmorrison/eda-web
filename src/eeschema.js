@@ -42,7 +42,7 @@ function EeSchema(container) {
 	this.deltas = $('<div class="coords" >0, 0</div>');
 	this.redrawTime = $('<div class="redraw-time" >redraw</div>');
 	this.workerStatus =  (typeof(Worker) === 'undefined') ? 'unsupported' : 'supported';
-	this.disableWorkers = !(window.location.href.indexOf('disableWorkers=T') == -1 && this.workerStatus == 'supported');
+	this.disableWorkers = true; //!(window.location.href.indexOf('disableWorkers=T') == -1 && this.workerStatus == 'supported');
 	this.motionContainer = $('<div class="eeschema-motion-container" />');
 	
 	this.schematic = {};
@@ -127,7 +127,7 @@ function EeSchema(container) {
 	this.fcanvas.setWidth(this.canvasContainer.width());
 	this.fcanvas.setHeight(this.canvasContainer.height());
 	
-	if(this.disableWorkers) {
+	/*if(this.disableWorkers) {
 		this.workerStatus = 'loading';
 		this.deferredJobs = [];
 		console.log('Not using workers. Loading ', edaRoot, 'worker.js');
@@ -143,7 +143,7 @@ function EeSchema(container) {
 				func.apply(ees, job.params);
 			}
 		});
-	}
+	}*/
 }
 
 EeSchema.prototype._init = function() {
@@ -436,6 +436,7 @@ EeSchema.prototype.parseSchematic = function(txt) {
 				});
 			}
 			else if(props[0] == '$Descr') {
+				this.schematic.description = {};
 				this.schematic.description.sheetSize = props[1];
 				this.schematic.description.sheetWidth = props[2];
 				this.schematic.description.sheetHeight = props[3];
