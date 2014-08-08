@@ -12,6 +12,7 @@ function ComponentDefinition(fabric_canvas) {
 	this.elements = [];
 	this.fcanvas = fabric_canvas;
 	this.widthFactor = 4;
+	this.defaultThickness = 1;
 }
 
 ComponentDefinition.prototype.parse = function(def) {			
@@ -126,7 +127,7 @@ ComponentDefinition.prototype.parseDrawField = function(props) {
 			'y1': parseInt(props[4]),
 			'unit': props[5], 
 			'convert': props[6],
-			'thickness': props[7],
+			'thickness': parseInt(props[7]),
 			'cc': props[8]
 		});
 	}
@@ -217,13 +218,13 @@ function describeArc(x, y, radius, startAngle, endAngle){
     return d;       
 }
 
-ComponentDefinition.prototype.Create = function() {	
+ComponentDefinition.prototype.Create = function(x, y) {	
 	var pinRadius = 16;
 	var width = 4;
 	var center = { left: 0, top: 0 };
-	console.log(this.name);
 	
 	var group = new fabric.Group();
+	group.set({ originX: 0, originY: 0, left: x, top: y });
 	
 	for(var i = 0; i < this.elements.length; i++) {
 		var el = this.elements[i];
@@ -236,12 +237,18 @@ ComponentDefinition.prototype.Create = function() {
 				path += ' L ' + el.points[j][0] + ' ' + el.points[j][1];
 			}
 			
-			path += ' z';
+			path += ' Z';
 			
 			var path = new fabric.Path(path);
-			path.set({ stroke: 'black', strokeWidth: this.widthFactor, originX: center.left, originY: center.top });
+			path.set({ fill: 'transparent', stroke: 'black', strokeWidth: this.widthFactor, originX: 0, originY: 0 });
 			path.hasBorders = path.hasControls = false;
-			group.addWithUpdate(path);
+			
+			var poly = new fabric.Group([path], {
+				originX: 0,
+				originY: 0
+			});
+			
+			group.add(poly);
 		}
 		else if(el.type == 'X') {
 			var visible = true;
@@ -249,7 +256,7 @@ ComponentDefinition.prototype.Create = function() {
 			if(typeof el.shape != 'undefined' && el.shape.length > 0)
 				visible = el.shape[0] != 'N';
 		
-			var pin = new fabric.Circle({ 
+			var circle = new fabric.Circle({ 
 				radius: pinRadius, 
 				fill: 'white', 
 				stroke: 'black', 
@@ -313,11 +320,14 @@ ComponentDefinition.prototype.Create = function() {
 			
 			name.hasBorders = name.hasControls = false;
 			line.hasBorders = line.hasControls = false;
-			pin.hasBorders = pin.hasControls = false;
+			circle.hasBorders = circle.hasControls = false;
 			
-			group.addWithUpdate(name);
-			group.addWithUpdate(line);
-			group.addWithUpdate(pin);
+			var pin = new fabric.Group([name, line, circle], {
+				originX: 0,
+				originY: 0
+			});
+			
+			group.add(pin);
 		}
 		else if(el.type == 'C') {
 			var circle = new fabric.Circle({ 
@@ -331,10 +341,11 @@ ComponentDefinition.prototype.Create = function() {
 				top: el.y0 });
 			
 			circle.hasBorders = circle.hasControls = false;
-			group.addWithUpdate(circle);
+			group.add(circle);
 		}
 		else if(el.type == 'S') {
 		    var x0, x1, y0, y1;
+			var thickness = el.thickness ? el.thickness : this.defaultThickness;
 		    
 		    if(el.x0 > el.x1) {
 		        x0 = el.x1;
@@ -354,78 +365,52 @@ ComponentDefinition.prototype.Create = function() {
                 y1 = el.y1;
             }
 		    
-            var line1 = new fabric.Line([ el.x0, el.y0, el.x1, el.y0 ], {
+            var line1 = new fabric.Line([ x0, y0, x1, y0 ], {
 				stroke: 'black',
-				strokeWidth: el.thickness * this.widthFactor,
-				originX: 0,
-				originY: 0
+				strokeWidth: thickness * this.widthFactor
 			});
 			
-			
-			var line2 = new fabric.Line([ el.x1, el.y0, el.x1, el.y1 ], {
+			var line2 = new fabric.Line([ x1, y0, x1, y1 ], {
 				stroke: 'black',
-				strokeWidth: el.thickness * this.widthFactor,
-				originX: 0,
-				originY: 0
+				strokeWidth: thickness * this.widthFactor
 			});
 			
-            var line3 = new fabric.Line([ el.x0, el.y1, el.x1, el.y1 ], {
+            var line3 = new fabric.Line([ x0, y1, x1, y1 ], {
 				stroke: 'black',
-				strokeWidth: el.thickness * this.widthFactor,
-				originX: 0,
-				originY: 0
+				strokeWidth: thickness * this.widthFactor
 			});
 			
-            var line4 = new fabric.Line([ el.x0, el.y0, el.x0, el.y1 ], {
+            var line4 = new fabric.Line([ x0, y0, x0, y1 ], {
 				stroke: 'black',
-				strokeWidth: el.thickness * this.widthFactor,
-				originX: 0,
-				originY: 0
+				strokeWidth: thickness * this.widthFactor
 			});
-
-/*			var rect = new fabric.Rect({
-				fill: 'transparent',
-				stroke: 'red',
-				strokeWidth: 2,
-				left: left, 
-				top: top,
-				width: swidth,
-				height: sheight
-			});*/
 			
-			if(this.name == 'GSB311231HR') {
-			console.log('purple');
-			  //  rect.set({ stroke: 'purple' });
-			}
-			
-			//console.log(el.x0, el.y0, el.x1, el.y1, swidth, sheight);
-			
-			//rect.set({ strokeWidth: 5, originX: center.left, originY: center.top });
-			
-			//rect.hasBorders = rect.hasControls = false;
-			//group.addWithUpdate(rect);
-			
-			group.addWithUpdate(line1);
-			group.addWithUpdate(line2);
-			group.addWithUpdate(line3);
-			group.addWithUpdate(line4);
+			group.add(line1);
+			group.add(line2);
+			group.add(line3);
+			group.add(line4);
 		}
-		else if(el.type == 'A') {		
-			var def = describeArc(el.x0, el.y0, el.radius, el.start/10, el.end/10);
-			
-			def = 'M' + el.sX + ' ' + el.sY + ' A' + el.radius + ' ' + el.radius + ' 0 0 1 ' + el.eX + ' ' + el.eY;
+		else if(el.type == 'A') {			
+			var def = 'M' + el.sX + ' ' + el.sY + ' A' + el.radius + ' ' + el.radius + ' 0 0 1 ' + el.eX + ' ' + el.eY;
 			
 			var path = new fabric.Path(def);
 			path.hasBorders = path.hasControls = false;
 			path.set({ 
 			    stroke: 'black',
 			    strokeWidth: this.widthFactor,
-			    originX: el.x0, 
-			    originY: el.y0,
+				left: el.x0,
+				top: el.y0,
+			    originX: center.left, 
+			    originY: center.top,
                 fill: el.cc == 'N' ? 'transparent' : 'black'
 			});
 			
-			group.addWithUpdate(path);
+			var arc = new fabric.Group([path], {
+				originX: 0,
+				originY: 0
+			});
+			
+			group.add(arc);
 		}
 	}
 	
