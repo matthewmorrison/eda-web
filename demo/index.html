@@ -36,8 +36,11 @@
             else if(file == 'hammer') {
                 window.loadedHammer = true;
             }
+			else if(file == 'fabric') {
+				window.loadedFabric = true;
+			}
             
-            if(window.loadedEES && window.loadedEESC && window.loadedHammer) {
+            if(window.loadedEES && window.loadedEESC && window.loadedHammer && window.loadedFabric) {
                 loadTest();
             }
         }
