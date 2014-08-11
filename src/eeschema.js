@@ -37,7 +37,7 @@ function EeSchema(container) {
 	this.canvasContainer = $('<div class="eeschema-canvas-container" />');
 	this.coords = $('<div class="eeschema-coords" >Coords</div>');
 	this.canvasTouch = $('<div class="eeschema-canvas-touch" >');
-	this.target = $('<div class="debug" >27</div>');
+	this.target = $('<div class="debug" >28</div>');
 	this.scale = $('<div class="scale" >1</div>');
 	this.deltas = $('<div class="coords" >0, 0</div>');
 	this.redrawTime = $('<div class="redraw-time" >redraw</div>');
@@ -226,9 +226,9 @@ EeSchema.prototype._init = function() {
 			    ees.transform.scale = initScale * ev.scale;
 			}
 			
-			if(ev.type == 'panmove') {
+			/*if(ev.type == 'panmove') {
 				ees.transform.scale += .01;
-			}
+			}*/
             
             if(ev.type == 'panstart') {		
 				startDraw = new Date().getTime();
