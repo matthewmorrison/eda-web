@@ -192,7 +192,7 @@ EeSchema.prototype._init = function() {
 			var start = new Date().getTime();
 			
 			var zoom = ees.fcanvas.getZoom();
-			var svg = ees.fcanvas.toSVG();
+			var svg = ees.fcanvas.toSVG({ viewBox: { x: 0, y: 0, width: containerWidth, height: containerHeight } });
 			
 			ees.fcanvas.setZoom(zoom);			
 			svg = 'data:image/svg+xml;base64,' + btoa(svg);
@@ -200,6 +200,7 @@ EeSchema.prototype._init = function() {
 			var rt = new Date().getTime() - start;
 			ees.redrawTime.html('<span>' + rt + '</span>');
 			ees.canvasContainer.find('.canvas-container').css('visibility', 'hidden');
+			requestElementUpdate();
 		}
 		else if(ev.isFinal) {
 			ees.motionContainer.css('background-image', 'none');
