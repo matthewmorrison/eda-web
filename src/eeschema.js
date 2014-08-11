@@ -166,8 +166,7 @@ EeSchema.prototype._init = function() {
 		rz: 0
 	};
 	
-	var timer;	
-	//var el = document.querySelector(".canvas-container");
+	var timer;
 	var el = document.querySelector(".eeschema-motion-container");
 	
 	mc = new Hammer.Manager(document.querySelector(".eeschema-canvas-touch"));
@@ -195,22 +194,9 @@ EeSchema.prototype._init = function() {
 			var zoom = ees.fcanvas.getZoom();
 			var svg = ees.fcanvas.toSVG();
 			
-			ees.fcanvas.setZoom(zoom);
-			
-			//ees.motionContainer.html(svg);
-			
+			ees.fcanvas.setZoom(zoom);			
 			svg = 'data:image/svg+xml;base64,' + btoa(svg);
-			//console.log(svg);
 			ees.motionContainer.css('background-image', 'url(' + svg + ')');
-			
-			/*var img = $('<img />');
-			
-			img.attr('src', svg);
-			
-			var z = ees.motionContainer.width()/zoom;
-			console.log(z);
-			
-			ees.motionContainer.append(img);*/
 			var rt = new Date().getTime() - start;
 			ees.redrawTime.html('<span>' + rt + '</span>');
 			ees.canvasContainer.find('canvas-container').css('visibility', 'hidden');
@@ -238,6 +224,10 @@ EeSchema.prototype._init = function() {
 			
 			if(isPinching) {
 			    ees.transform.scale = initScale * ev.scale;
+			}
+			
+			if(ev.type == 'panmove') {
+				ees.transform.scale += .01;
 			}
             
             if(ev.type == 'panstart') {		
@@ -313,20 +303,27 @@ EeSchema.prototype._init = function() {
 		if(doRedraw) {
 			redraw();
 		}
-	
+		
 		var value = [
 			'translate3d(' + ees.transform.translate.x + 'px, ' + ees.transform.translate.y + 'px, 0)',
 			//'scale(' + ees.transform.scale + ', ' + ees.transform.scale + ')',
 			'rotate3d('+ ees.transform.rx +','+ ees.transform.ry +','+ ees.transform.rz +','+  ees.transform.angle + 'deg)'
 		];
 
+		var xFactor = (ees.transform.scale * containerWidth);
+		var yFactor = (ees.transform.scale * containerHeight);
+		
 		value = value.join(" ");
 		el.style.webkitTransform = value;
 		el.style.mozTransform = value;
 		el.style.transform = value;
-		el.style.width = parseInt(ees.transform.scale * containerWidth) + 'px';
-		el.style.height = parseInt(ees.transform.scale * containerHeight) + 'px';
+		el.style.width = xFactor + 'px';
+		el.style.left = (containerWidth - xFactor)/2 + 'px';
+		el.style.height = yFactor + 'px';
+		el.style.top = (containerHeight - yFactor)/2 + 'px';
 		ticking = false;
+		
+		console.log((containerWidth - (ees.transform.scale * containerWidth))/2);
 	}
 
 	function requestElementUpdate() {
