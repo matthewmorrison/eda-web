@@ -213,8 +213,11 @@ EeSchema.prototype._init = function() {
 			ees.motionContainer.append(img);*/
 			var rt = new Date().getTime() - start;
 			ees.redrawTime.html('<span>' + rt + '</span>');
+			ees.canvasContainer.find('canvas-container').css('visibility', 'hidden');
 		}
 		else if(ev.isFinal) {
+			ees.motionContainer.css('background-image', 'none');
+			ees.canvasContainer.find('canvas-container').css('visibility', 'visible');
 			redraw();
 			requestElementUpdate();
 		}
@@ -441,7 +444,7 @@ EeSchema.prototype.parseSchematic = function(txt) {
 				l_index += this.parseComponent(lines.slice(l_index));
 			}
 			else if(props[0] == 'Wire' || props[0] == 'Entry') {
-                //continue
+                continue
                     
 				var wire = {
 					type: props[0],
