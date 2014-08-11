@@ -199,11 +199,11 @@ EeSchema.prototype._init = function() {
 			ees.motionContainer.css('background-image', 'url(' + svg + ')');
 			var rt = new Date().getTime() - start;
 			ees.redrawTime.html('<span>' + rt + '</span>');
-			ees.canvasContainer.find('canvas-container').css('visibility', 'hidden');
+			ees.canvasContainer.find('.canvas-container').css('visibility', 'hidden');
 		}
 		else if(ev.isFinal) {
 			ees.motionContainer.css('background-image', 'none');
-			ees.canvasContainer.find('canvas-container').css('visibility', 'visible');
+			ees.canvasContainer.find('.canvas-container').css('visibility', 'visible');
 			redraw();
 			requestElementUpdate();
 		}
